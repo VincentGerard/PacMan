@@ -36,6 +36,9 @@
 *.out
 *.app
 
+# Exec PacMan
+PacMan
+
 # PDF
 *.pdf
 

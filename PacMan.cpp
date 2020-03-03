@@ -229,6 +229,9 @@ void* threadPacMan(void*)
 
 	while(1)
 	{
+		int modifier = 0;
+		int L2 = L;
+		int C2 = C;
 		//Zone critique ne pas recevoir de signal durant l'attente
 		sigfillset(&mask3);
 		sigprocmask(SIG_SETMASK,&mask3,NULL);
@@ -244,31 +247,46 @@ void* threadPacMan(void*)
 			case HAUT:
 				if(tab[L - 1][C] != MUR)
 				{
-					EffaceCarre(L,C);
-					MonDessinePacMan(L - 1,C,DIR);
+					modifier++;
+					L2--;
 				}
 				break;
 			case BAS:
 				if(tab[L + 1][C] != MUR)
 				{
-					EffaceCarre(L,C);
-					MonDessinePacMan(L + 1,C,DIR);
+					modifier++;
+					L2++;
 				}
 				break;
 			case GAUCHE:
 				if(tab[L][C - 1] != MUR)
 				{
-					EffaceCarre(L,C);
-					MonDessinePacMan(L,C - 1,DIR);
+					modifier++;
+					C2--;
 				}
 				break;
 			case DROITE:
 				if(tab[L][C + 1] != MUR)
 				{
-					EffaceCarre(L,C);
-					MonDessinePacMan(L,C + 1,DIR);
+					modifier++;
+					C2++;
 				}
 				break;
+		}
+		if(modifier)
+		{
+			sigfillset(&mask3);
+			sigprocmask(SIG_SETMASK,&mask3,NULL);
+
+			EffaceCarre(L,C);
+			MonDessinePacMan(L2,C2,DIR);
+
+			sigemptyset(&mask3);
+			sigaction(SIGINT,&A1,NULL);
+			sigaction(SIGHUP,&A2,NULL);
+			sigaction(SIGUSR1,&A3,NULL);
+			sigaction(SIGUSR2,&A4,NULL);
+			sigprocmask(SIG_SETMASK,&mask3,NULL);
 		}
 	}
 
