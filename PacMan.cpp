@@ -1,3 +1,12 @@
+/*
+Ca sert a quoi condNbPacGom?
+
+
+
+*/
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -27,18 +36,27 @@
 int L;
 int C;
 int DIR;
+int nbPacGom;
+int delai = 300;
+int niveauJeu = 1;
 pthread_mutex_t mutexTab;
 pthread_mutex_t mutexLCDIR;
+pthread_mutex_t mutexNbPacGom;
 
 pthread_t tidPacMan;
 pthread_t tidEvent;
+pthread_t tidPacGom;
+//Utile pour connaitre le pid? Ou pas besoin car le pid ne change pas mais si le thread demande
+//le pid avant que l'autre thread ne soit lancer on peu avoir un probleme car tid = 0
 pthread_mutex_t mutexTidPacMan;
-pthread_mutex_t mutexTidEvent;//Pas encore utils
+pthread_mutex_t mutexTidEvent;
+pthread_mutex_t mutexTidPacGom;
 
 
 //Fonctions
 void* threadPacMan(void*);
 void* threadEvent(void*);
+void* threadPacGom(void*);
 void HandlerInt(int s);
 void HandlerHup(int s);
 void HandlerUsr1(int s);
@@ -93,9 +111,6 @@ int main(int argc,char* argv[])
 	//Debut de notre prog
 	printf("[Main][Debut]Pid: %d\n",getpid());
 
-	//Armer les singnaux
-
-
 	//Masquer les signaux
 	sigset_t mask;
 	sigemptyset(&mask);
@@ -104,8 +119,6 @@ int main(int argc,char* argv[])
 	sigaddset(&mask,SIGHUP);
 	sigaddset(&mask,SIGINT);
 	sigprocmask(SIG_SETMASK,&mask,NULL);
-
-
 
 	//mutexTab
 	if(pthread_mutex_init(&mutexTab,NULL))
@@ -121,14 +134,14 @@ int main(int argc,char* argv[])
 	}
 
 	//Ouverture des threads
+	//Thread PacGom
+	pthread_create(&tidPacGom,NULL,threadPacGom,NULL);
 	//Thread PacMan
 	pthread_create(&tidPacMan,NULL,threadPacMan,NULL);
-
 	//Thread Event
 	pthread_create(&tidEvent,NULL,threadEvent,NULL);
 
 	//Au finial ne faire un join que sur l'event
-	// pthread_join(tidPacMan,NULL);
 	pthread_join(tidEvent,NULL);
 
 
@@ -143,6 +156,7 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_mutex_destroy on mutexLCDIR\n");
 		exit(1);
 	}
+	printf("[Main][Fin]\n");
 
 	// Fermeture de la fenetre
 	printf("(MAIN %d) Fermeture de la fenetre graphique...",pthread_self()); fflush(stdout);
@@ -176,6 +190,7 @@ void* threadPacMan(void*)
 {
 	printf("[threadPacMan][Debut]Tid: %d\n",pthread_self());
 
+	//Armement des signaux sur tout le processus
 	//sigint
 	struct sigaction A1;
 	A1.sa_handler = HandlerInt;
@@ -235,7 +250,7 @@ void* threadPacMan(void*)
 		//Zone critique ne pas recevoir de signal durant l'attente
 		sigfillset(&mask3);
 		sigprocmask(SIG_SETMASK,&mask3,NULL);
-		Attente(300);
+		Attente(delai);
 		sigemptyset(&mask3);
 		sigaction(SIGINT,&A1,NULL);
 		sigaction(SIGHUP,&A2,NULL);
@@ -349,6 +364,62 @@ void* threadEvent(void*)
 	}
 
 	printf("[threadEvent][Fin]\n");
+}
+
+void* threadPacGom(void*)
+{
+	printf("[threadPacGom][Debut]Tid: %d\n",pthread_self());
+
+	if(pthread_mutex_lock(&mutexTab))
+	{
+
+		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
+		exit(1);
+	}
+
+	for(int x = 0; x < NB_LIGNE; x++)
+	{
+		for(int y = 0; y < NB_COLONNE; y++)
+		{
+			if(tab[x][y] == VIDE)
+			{
+				if(!(x == 15 && y == 8) && !(x == 8 && y == 8) && !(x == 9 && y == 8))
+				{
+					DessinePacGom(x,y);
+					nbPacGom++;
+				}
+			}
+		}
+	}
+	DessineSuperPacGom(2,1);
+	DessineSuperPacGom(2,15);
+	DessineSuperPacGom(15,1);
+	DessineSuperPacGom(15,15);
+	nbPacGom += 4;
+
+	if(pthread_mutex_unlock(&mutexTab))
+	{
+		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
+		exit(1);
+	}
+
+	if(pthread_mutex_lock(&mutexNbPacGom))
+	{
+		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+	}
+
+	while(nbPacGom > 0)
+	{
+		//Tant qu'on a pas tout manger on a pas gagner
+
+	}
+
+	if(pthread_mutex_unlock(&mutexNbPacGom))
+	{
+		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+	}
+
+	printf("[threadPacGom][Fin]\n");
 }
 
 void MonDessinePacMan(int l,int c,int dir)
