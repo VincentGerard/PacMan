@@ -1,8 +1,11 @@
 /*
 Ca sert a quoi condNbPacGom?
+//Section Critique Interface graphique
+On dois bloquer les signaux dans le thread event?
 
 
-
+A faire:
+-Finir les conds de l'etape 3
 */
 
 
@@ -32,6 +35,9 @@ Ca sert a quoi condNbPacGom?
 #define LENTREE 15
 #define CENTREE 8
 
+// Mes defines
+//#define DEBUG
+
 //Var global
 int L;
 int C;
@@ -48,9 +54,10 @@ pthread_t tidEvent;
 pthread_t tidPacGom;
 //Utile pour connaitre le pid? Ou pas besoin car le pid ne change pas mais si le thread demande
 //le pid avant que l'autre thread ne soit lancer on peu avoir un probleme car tid = 0
-pthread_mutex_t mutexTidPacMan;
-pthread_mutex_t mutexTidEvent;
-pthread_mutex_t mutexTidPacGom;
+// pthread_mutex_t mutexTidPacMan;
+// pthread_mutex_t mutexTidEvent;
+// pthread_mutex_t mutexTidPacGom;
+pthread_cond_t condNbPacGom;
 
 
 //Fonctions
@@ -62,6 +69,7 @@ void HandlerHup(int s);
 void HandlerUsr1(int s);
 void HandlerUsr2(int s);
 void MonDessinePacMan(int l,int c,int dir);
+void Debug(const char * format, ...);
 
 int tab[NB_LIGNE][NB_COLONNE]
 ={  {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
@@ -127,11 +135,25 @@ int main(int argc,char* argv[])
 		exit(1);
 	}
 	//mutexLCDIR
-	if(pthread_mutex_init(&mutexTab,NULL))
+	if(pthread_mutex_init(&mutexLCDIR,NULL))
 	{
 		perror("[Main][Erreur]pthread_mutex_init sur mutexLCDIR\n");
 		exit(1);
 	}
+	//mutexNbPacGom
+	if(pthread_mutex_init(&mutexNbPacGom,NULL))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNbPacGom\n");
+	}
+
+	//condNbPacGom
+	if(pthread_cond_int(&condNbPacGom, NULL))
+	{
+		perror("Main[Erreur]pthread_cond_int sur condNbPacGom\n");
+		exit(1);
+	}
+
+	
 
 	//Ouverture des threads
 	//Thread PacGom
@@ -143,7 +165,6 @@ int main(int argc,char* argv[])
 
 	//Au finial ne faire un join que sur l'event
 	pthread_join(tidEvent,NULL);
-
 
 	//Fin de notre prog
 	if(pthread_mutex_destroy(&mutexTab))
@@ -188,7 +209,7 @@ void DessineGrilleBase()
 
 void* threadPacMan(void*)
 {
-	printf("[threadPacMan][Debut]Tid: %d\n",pthread_self());
+	Debug("[threadPacMan][Debut]Tid: %d\n",pthread_self());
 
 	//Armement des signaux sur tout le processus
 	//sigint
@@ -240,7 +261,23 @@ void* threadPacMan(void*)
 		exit(1);
 	}
 
+	sigfillset(&mask3);
+	sigprocmask(SIG_SETMASK,&mask3,NULL);
+
 	MonDessinePacMan(15,8,GAUCHE);
+
+	sigemptyset(&mask3);
+	sigaction(SIGINT,&A1,NULL);
+	sigaction(SIGHUP,&A2,NULL);
+	sigaction(SIGUSR1,&A3,NULL);
+	sigaction(SIGUSR2,&A4,NULL);
+	sigprocmask(SIG_SETMASK,&mask3,NULL);
+
+	if(pthread_mutex_unlock(&mutexTab))
+	{
+		perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
+		exit(1);
+	}
 
 	while(1)
 	{
@@ -265,12 +302,22 @@ void* threadPacMan(void*)
 					modifier++;
 					L2--;
 				}
+				else if(L == 0)
+				{
+					modifier++;
+					L2 = NB_LIGNE - 1;
+				}	
 				break;
 			case BAS:
 				if(tab[L + 1][C] != MUR)
 				{
 					modifier++;
 					L2++;
+				}
+				else if(L == NB_LIGNE -1)
+				{
+					modifier++;
+					L2 = 0;
 				}
 				break;
 			case GAUCHE:
@@ -279,12 +326,22 @@ void* threadPacMan(void*)
 					modifier++;
 					C2--;
 				}
+				else if(C == 0)
+				{
+					modifier++;
+					C2 = NB_COLONNE - 1;
+				}
 				break;
 			case DROITE:
 				if(tab[L][C + 1] != MUR)
 				{
 					modifier++;
 					C2++;
+				}
+				else if(C == NB_COLONNE - 1)
+				{
+					modifier++;
+					C2 = 0;
 				}
 				break;
 		}
@@ -293,8 +350,21 @@ void* threadPacMan(void*)
 			sigfillset(&mask3);
 			sigprocmask(SIG_SETMASK,&mask3,NULL);
 
+			if(pthread_mutex_lock(&mutexTab))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexTab\n");
+				exit(1);
+			}
+
+			//Section Critique Interface graphique
 			EffaceCarre(L,C);
 			MonDessinePacMan(L2,C2,DIR);
+
+			if(pthread_mutex_unlock(&mutexTab))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
+				exit(1);
+			}
 
 			sigemptyset(&mask3);
 			sigaction(SIGINT,&A1,NULL);
@@ -303,12 +373,6 @@ void* threadPacMan(void*)
 			sigaction(SIGUSR2,&A4,NULL);
 			sigprocmask(SIG_SETMASK,&mask3,NULL);
 		}
-	}
-
-	if(pthread_mutex_unlock(&mutexTab))
-	{
-		perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
-		exit(1);
 	}
 
 	printf("[threadPacMan][Fin]\n");
@@ -344,39 +408,41 @@ void* threadEvent(void*)
 				{
 					case KEY_UP:
 						kill(getpid(),SIGUSR1);
-						printf("[threadEvent]SIGUSR1\n");
+						Debug("[threadEvent]SIGUSR1\n");
 						break;
 					case KEY_DOWN:
 						kill(getpid(),SIGUSR2);
-						printf("[threadEvent]SIGUSR2\n");
+						Debug("[threadEvent]SIGUSR2\n");
 						break;
 					case KEY_LEFT:
 						kill(getpid(),SIGINT);
-						printf("[threadEvent]SIGINT\n");
+						Debug("[threadEvent]SIGINT\n");
 						break;
 					case KEY_RIGHT:
 						kill(getpid(),SIGHUP);
-						printf("[threadEvent]SIGHUP\n");
+						Debug("[threadEvent]SIGHUP\n");
 						break;
 				}
 				break;
 		}
 	}
 
-	printf("[threadEvent][Fin]\n");
+	Debug("[threadEvent][Fin]\n");
 }
 
 void* threadPacGom(void*)
 {
 	printf("[threadPacGom][Debut]Tid: %d\n",pthread_self());
-
 	if(pthread_mutex_lock(&mutexTab))
 	{
-
 		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
 		exit(1);
 	}
-
+	if(pthread_mutex_lock(&mutexNbPacGom))
+	{
+		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+		exit(1);
+	}
 	for(int x = 0; x < NB_LIGNE; x++)
 	{
 		for(int y = 0; y < NB_COLONNE; y++)
@@ -386,46 +452,132 @@ void* threadPacGom(void*)
 				if(!(x == 15 && y == 8) && !(x == 8 && y == 8) && !(x == 9 && y == 8))
 				{
 					DessinePacGom(x,y);
+					tab[x][y] = PACGOM;
 					nbPacGom++;
 				}
 			}
 		}
 	}
+	//Section Critique Interface graphique
 	DessineSuperPacGom(2,1);
+	tab[2][1] = SUPERPACGOM;
 	DessineSuperPacGom(2,15);
+	tab[2][15] = SUPERPACGOM;
 	DessineSuperPacGom(15,1);
+	tab[15][1] = SUPERPACGOM;
 	DessineSuperPacGom(15,15);
+	tab[15][15] = SUPERPACGOM;
 	nbPacGom += 4;
 
 	if(pthread_mutex_unlock(&mutexTab))
 	{
 		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
 		exit(1);
-	}
-
-	if(pthread_mutex_lock(&mutexNbPacGom))
-	{
-		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
-	}
+	}	
 
 	while(nbPacGom > 0)
 	{
 		//Tant qu'on a pas tout manger on a pas gagner
-
 	}
 
 	if(pthread_mutex_unlock(&mutexNbPacGom))
 	{
 		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+		exit(1);
 	}
 
 	printf("[threadPacGom][Fin]\n");
 }
 
+void HandlerInt(int s)
+{
+	Debug("[HandlerInt]SIGINT\n");
+	if(pthread_mutex_lock(&mutexLCDIR))
+	{
+		perror("[HandlerInt][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		exit(1);
+	}
+	if(tab[L][C - 1] != MUR)
+	{
+		DIR = GAUCHE;
+		Debug("[HandlerInt]DIR = GAUCHE\n");
+	}
+	if(pthread_mutex_unlock(&mutexLCDIR))
+	{
+		perror("[HandlerInt][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		exit(1);
+	}
+}
+
+void HandlerHup(int s)
+{	
+	Debug("[HandlerHup]SIGHUP\n");
+	if(pthread_mutex_lock(&mutexLCDIR))
+	{
+		perror("[HandlerHup][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		exit(1);
+	}
+	if(tab[L][C + 1] != MUR)
+	{
+		DIR = DROITE;
+		Debug("[HandlerHup]DIR = DROITE\n");
+	}
+	if(pthread_mutex_unlock(&mutexLCDIR))
+	{
+		perror("[HandlerHup][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		exit(1);
+	}
+}
+
+void HandlerUsr1(int s)
+{
+	Debug("[HandlerUsr1]SIGUSR1\n");
+	if(pthread_mutex_lock(&mutexLCDIR))
+	{
+		perror("[HandlerUsr1][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		exit(1);
+	}
+	if(tab[L - 1][C] != MUR)
+	{
+		DIR = HAUT;
+		Debug("[HandlerUsr1]DIR = HAUT\n");
+	}
+	if(pthread_mutex_unlock(&mutexLCDIR))
+	{
+		perror("[HandlerUsr1][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		exit(1);
+	}
+}
+
+void HandlerUsr2(int s)
+{
+	Debug("[HandlerUsr2]SIGUSR2\n");
+	if(pthread_mutex_lock(&mutexLCDIR))
+	{
+		perror("[HandlerUsr2][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		exit(1);
+	}
+	if(tab[L + 1][C] != MUR)
+	{
+		DIR = BAS;
+		Debug("[HandlerUsr2]DIR = BAS\n");
+	}
+	if(pthread_mutex_unlock(&mutexLCDIR))
+	{
+		perror("[HandlerUsr2][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		exit(1);
+	}
+}
+
 void MonDessinePacMan(int l,int c,int dir)
 {
+	Debug("[MonDessinePacMan]l = %d,c = %d,dir = %d",l,c,dir);
+	
+	//Section Critique Interface graphique
 	DessinePacMan(l,c,dir);
+	//Section critique tab
 	tab[l][c] = PACMAN;
+
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
 		perror("[MonDessinePacMan][Erreur]pthread_mutex_lock on mutexLCDIR\n");
@@ -440,87 +592,21 @@ void MonDessinePacMan(int l,int c,int dir)
 	}
 }
 
-void HandlerInt(int s)
+void Debug(const char * format, ...)
 {
-	printf("[HandlerInt]SIGINT\n");
-	if(pthread_mutex_lock(&mutexLCDIR))
-	{
-		perror("[HandlerInt][Erreur]pthread_mutex_lock on mutexLCDIR\n");
-		exit(1);
-	}
-	if(tab[L][C - 1] != MUR)
-	{
-		DIR = GAUCHE;
-		printf("[HandlerInt]DIR = GAUCHE\n");
-	}
-	if(pthread_mutex_unlock(&mutexLCDIR))
-	{
-		perror("[HandlerInt][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
-		exit(1);
-	}
+	#ifdef DEBUG
+    int tailleFormat = strlen(format);
+
+    va_list args;
+    va_start (args, format);
+    vfprintf (stdout, format, args);
+    if(format[tailleFormat - 1] != '\n')
+    {
+        printf("\n");
+    }
+    va_end(args);
+    #endif
 }
-
-void HandlerHup(int s)
-{	
-	printf("[HandlerHup]SIGHUP\n");
-	if(pthread_mutex_lock(&mutexLCDIR))
-	{
-		perror("[HandlerHup][Erreur]pthread_mutex_lock on mutexLCDIR\n");
-		exit(1);
-	}
-	if(tab[L][C + 1] != MUR)
-	{
-		DIR = DROITE;
-		printf("[HandlerHup]DIR = DROITE\n");
-	}
-	if(pthread_mutex_unlock(&mutexLCDIR))
-	{
-		perror("[HandlerHup][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
-		exit(1);
-	}
-}
-
-void HandlerUsr1(int s)
-{
-	printf("[HandlerUsr1]SIGUSR1\n");
-	if(pthread_mutex_lock(&mutexLCDIR))
-	{
-		perror("[HandlerUsr1][Erreur]pthread_mutex_lock on mutexLCDIR\n");
-		exit(1);
-	}
-	if(tab[L - 1][C] != MUR)
-	{
-		DIR = HAUT;
-		printf("[HandlerUsr1]DIR = HAUT\n");
-	}
-	if(pthread_mutex_unlock(&mutexLCDIR))
-	{
-		perror("[HandlerUsr1][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
-		exit(1);
-	}
-}
-
-void HandlerUsr2(int s)
-{
-	printf("[HandlerUsr2]SIGUSR2\n");
-	if(pthread_mutex_lock(&mutexLCDIR))
-	{
-		perror("[HandlerUsr2][Erreur]pthread_mutex_lock on mutexLCDIR\n");
-		exit(1);
-	}
-	if(tab[L + 1][C] != MUR)
-	{
-		DIR = BAS;
-		printf("[HandlerUsr2]DIR = BAS\n");
-	}
-	if(pthread_mutex_unlock(&mutexLCDIR))
-	{
-		perror("[HandlerUsr2][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
-		exit(1);
-	}
-}
-
-
 
 
 
