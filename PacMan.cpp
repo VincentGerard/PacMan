@@ -1,11 +1,6 @@
 /*
-Ca sert a quoi condNbPacGom?
-//Section Critique Interface graphique
-On dois bloquer les signaux dans le thread event?
-
-
-A faire:
--Finir les conds de l'etape 3
+On dois remplir les cases (8,8)(9,8) avec des pac goms quand le joueur gagne?
+On fait reaparaitre ou les fantomes?
 */
 
 
@@ -15,7 +10,7 @@ A faire:
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
-#include <time.h>
+#include <time.h>	
 #include "GrilleSDL.h"
 #include "Ressources.h"
 
@@ -45,10 +40,12 @@ int DIR;
 int nbPacGom;
 int delai = 300;
 int niveauJeu = 1;
+int score = 0;
 pthread_mutex_t mutexTab;
 pthread_mutex_t mutexLCDIR;
 pthread_mutex_t mutexNbPacGom;
 pthread_mutex_t mutexDelai;
+pthread_mutex_t mutexNiveauJeu;
 
 pthread_t tidPacMan;
 pthread_t tidEvent;
@@ -129,29 +126,31 @@ int main(int argc,char* argv[])
 	sigaddset(&mask,SIGINT);
 	sigprocmask(SIG_SETMASK,&mask,NULL);
 
-	//mutexTab
 	if(pthread_mutex_init(&mutexTab,NULL))
 	{
 		perror("[Main][Erreur]pthread_mutex_init sur mutexTab\n");
 		exit(1);
 	}
-	//mutexLCDIR
 	if(pthread_mutex_init(&mutexLCDIR,NULL))
 	{
 		perror("[Main][Erreur]pthread_mutex_init sur mutexLCDIR\n");
 		exit(1);
 	}
-	//mutexNbPacGom
 	if(pthread_mutex_init(&mutexNbPacGom,NULL))
 	{
 		perror("[Main][Erreur]pthread_mutex_init sur mutexNbPacGom\n");
+		exit(1);
 	}
-	//mutexDelai
 	if(pthread_mutex_init(&mutexDelai,NULL))
 	{
 		perror("[Main][Erreur]pthread_mutex_init sur mutexDelai\n");
+		exit(1);
 	}
-	//condNbPacGom
+	if(pthread_mutex_init(&mutexNiveauJeu,NULL))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNiveauJeu\n");
+		exit(1);
+	}
 	if(pthread_cond_init(&condNbPacGom,NULL))
 	{
 		perror("Main[Erreur]pthread_cond_int sur condNbPacGom\n");
@@ -180,6 +179,26 @@ int main(int argc,char* argv[])
 	if(pthread_mutex_destroy(&mutexLCDIR))
 	{
 		perror("[Main][Erreur]pthread_mutex_destroy on mutexLCDIR\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbPacGom))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexDelai))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexDelai\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNiveauJeu))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNiveauJeu\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condNbPacGom))
+	{
+		perror("Main[Erreur]pthread_cond_int sur condNbPacGom\n");
 		exit(1);
 	}
 	printf("[Main][Fin]\n");
@@ -287,6 +306,8 @@ void* threadPacMan(void*)
 	while(1)
 	{
 		int modifier = 0;
+		int mangerPacGom = 0;
+		int mangerSuperPacGom = 0;
 		int L2 = L;
 		int C2 = C;
 		//Zone critique ne pas recevoir de signal durant l'attente
@@ -314,19 +335,19 @@ void* threadPacMan(void*)
 			case HAUT:
 				if(tab[L - 1][C] != MUR)
 				{
-					if(tab[L - 1][C] == PACGOM || tab[L - 1][C] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L - 1][C] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L - 1][C] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					L2--;
 				}
 				else if(L == 0)
 				{
-					if(tab[NB_LIGNE - 1][C] == PACGOM || tab[NB_LIGNE - 1][C] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[NB_LIGNE - 1][C] == PACGOM)
+						mangerPacGom++;
+					else if(tab[NB_LIGNE - 1][C] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					L2 = NB_LIGNE - 1;
 				}	
@@ -334,19 +355,19 @@ void* threadPacMan(void*)
 			case BAS:
 				if(tab[L + 1][C] != MUR)
 				{
-					if(tab[L + 1][C] == PACGOM || tab[L + 1][C] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L + 1][C] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L + 1][C] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					L2++;
 				}
 				else if(L == NB_LIGNE -1)
 				{
-					if(tab[0][C] == PACGOM || tab[0][C] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[0][C] == PACGOM)
+						mangerPacGom++;
+					else if(tab[0][C] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					L2 = 0;
 				}
@@ -354,19 +375,19 @@ void* threadPacMan(void*)
 			case GAUCHE:
 				if(tab[L][C - 1] != MUR)
 				{
-					if(tab[L][C - 1] == PACGOM || tab[L][C - 1] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L][C - 1] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L][C - 1] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					C2--;
 				}
 				else if(C == 0)
 				{
-					if(tab[L][NB_COLONNE - 1] == PACGOM || tab[L][NB_COLONNE - 1] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L][NB_COLONNE - 1] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L][NB_COLONNE - 1] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					C2 = NB_COLONNE - 1;
 				}
@@ -374,19 +395,19 @@ void* threadPacMan(void*)
 			case DROITE:
 				if(tab[L][C + 1] != MUR)
 				{
-					if(tab[L][C + 1] == PACGOM || tab[L][C + 1] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L][C + 1] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L][C + 1] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					C2++;
 				}
 				else if(C == NB_COLONNE - 1)
 				{
-					if(tab[L][0] == PACGOM || tab[L][0] == SUPERPACGOM)
-					{
-						pthread_cond_signal(&condNbPacGom);
-					}
+					if(tab[L][0] == PACGOM)
+						mangerPacGom++;
+					else if(tab[L][0] == SUPERPACGOM)
+						mangerSuperPacGom++;
 					modifier++;
 					C2 = 0;
 				}
@@ -403,6 +424,7 @@ void* threadPacMan(void*)
 				exit(1);
 			}
 
+			tab[L][C] = VIDE;
 			//Section Critique Interface graphique
 			EffaceCarre(L,C);
 			MonDessinePacMan(L2,C2,DIR);
@@ -419,6 +441,40 @@ void* threadPacMan(void*)
 			sigaction(SIGUSR1,&A3,NULL);
 			sigaction(SIGUSR2,&A4,NULL);
 			sigprocmask(SIG_SETMASK,&mask3,NULL);
+		}
+		if(mangerPacGom)
+		{
+			//Incrementer le score de 1
+			//Decrementer le nbPacGom de 1
+			if(pthread_mutex_lock(&mutexNbPacGom))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				exit(1);
+			}
+			nbPacGom--;
+			if(pthread_mutex_unlock(&mutexNbPacGom))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				exit(1);
+			}
+			pthread_cond_signal(&condNbPacGom);
+		}
+		if(mangerSuperPacGom)
+		{
+			//incrementer le score de 5
+			//Decrementer le nbPacGom de 1
+			if(pthread_mutex_lock(&mutexNbPacGom))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				exit(1);
+			}
+			nbPacGom--;
+			if(pthread_mutex_unlock(&mutexNbPacGom))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				exit(1);
+			}
+			pthread_cond_signal(&condNbPacGom);
 		}
 	}
 
@@ -479,89 +535,152 @@ void* threadEvent(void*)
 
 void* threadPacGom(void*)
 {
-	int valeur1 = 0;
-	int valeur2 = 0;
-	int valeur3 = 0;
 	printf("[threadPacGom][Debut]Tid: %d\n",pthread_self());
-	if(pthread_mutex_lock(&mutexTab))
+
+	while(1)
 	{
-		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
-		exit(1);
-	}
-	if(pthread_mutex_lock(&mutexNbPacGom))
-	{
-		perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
-		exit(1);
-	}
-	for(int x = 0; x < NB_LIGNE; x++)
-	{
-		for(int y = 0; y < NB_COLONNE; y++)
+		int valeur1 = 0;
+		int valeur2 = 0;
+		int valeur3 = 0;
+
+		//Init PacGom
+		if(pthread_mutex_lock(&mutexTab))
 		{
-			if(tab[x][y] == VIDE)
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
+			exit(1);
+		}
+		if(pthread_mutex_lock(&mutexNbPacGom))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+			exit(1);
+		}
+		for(int x = 0; x < NB_LIGNE; x++)
+		{
+			for(int y = 0; y < NB_COLONNE; y++)
 			{
-				if(!(x == 15 && y == 8) && !(x == 8 && y == 8) && !(x == 9 && y == 8) && !(x == 2 && y == 1) && !(x == 2 && y == 15) && !(x == 15 && y == 1) && !(x == 15 && y == 15))
+				if(tab[x][y] == VIDE)
 				{
-					DessinePacGom(x,y);
-					tab[x][y] = PACGOM;
-					nbPacGom++;
+					if(!(x == 15 && y == 8) && !(x == 8 && y == 8) && !(x == 9 && y == 8) && !(x == 2 && y == 1) && !(x == 2 && y == 15) && !(x == 15 && y == 1) && !(x == 15 && y == 15))
+					{
+						DessinePacGom(x,y);
+						tab[x][y] = PACGOM;
+						nbPacGom++;
+					}
 				}
 			}
 		}
-	}
-	//Section Critique Interface graphique???
-	DessineSuperPacGom(2,1);
-	tab[2][1] = SUPERPACGOM;
-	DessineSuperPacGom(2,15);
-	tab[2][15] = SUPERPACGOM;
-	DessineSuperPacGom(15,1);
-	tab[15][1] = SUPERPACGOM;
-	DessineSuperPacGom(15,15);
-	tab[15][15] = SUPERPACGOM;
-	nbPacGom += 4;
+		DessineSuperPacGom(2,1);
+		tab[2][1] = SUPERPACGOM;
+		DessineSuperPacGom(2,15);
+		tab[2][15] = SUPERPACGOM;
+		DessineSuperPacGom(15,1);
+		tab[15][1] = SUPERPACGOM;
+		DessineSuperPacGom(15,15);
+		tab[15][15] = SUPERPACGOM;
+		nbPacGom += 4;
 
-	if(pthread_mutex_unlock(&mutexTab))
-	{
-		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
-		exit(1);
-	}	
-
-	if(pthread_mutex_unlock(&mutexNbPacGom))
-	{
-		perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
-		exit(1);
-	}
-	printf("[threadPacGom]1\n");
-
-	while(nbPacGom > 0)
-	{
-		printf("[threadPacGom]valeur1: %d valeur2: %d valeur3: %d\n",valeur1,valeur2,valeur3);
-		//Tant qu'on a pas tout manger on a pas gagner
-		//condNbPacGom
-		if(pthread_mutex_lock(&mutexNbPacGom))
+		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom");
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
 			exit(1);
-		}
-		pthread_cond_wait(&condNbPacGom,&mutexNbPacGom);
-
-		nbPacGom--;
-
-		valeur1 = nbPacGom / 100;
-		valeur2 = (nbPacGom - ((nbPacGom / 100) * 100)) / 10 ;
-		valeur3 = (nbPacGom - ((nbPacGom / 100) * 100) - (((nbPacGom - ((nbPacGom / 100) * 100)) / 10) * 10)) / 1;
+		}	
 
 		if(pthread_mutex_unlock(&mutexNbPacGom))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
 			exit(1);
 		}
 
-		DessineChiffre(12,22,valeur1);
-		DessineChiffre(12,23,valeur2);
-		DessineChiffre(12,24,valeur3);
-	}
+		//Afficher le niveau de jeu
+		if(pthread_mutex_lock(&mutexNiveauJeu))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNiveauJeu\n");
+			exit(1);
+		}
+		DessineChiffre(14,22,niveauJeu);
+		if(pthread_mutex_unlock(&mutexNiveauJeu))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n");
+			exit(1);
+		}
 
-	printf("[threadPacGom][Fin]\n");
+		//Attendre que le joueur gagne
+		while(nbPacGom > 0)
+		{
+			printf("[threadPacGom]valeur1: %d valeur2: %d valeur3: %d\n",valeur1,valeur2,valeur3);
+
+			if(pthread_mutex_lock(&mutexNbPacGom))
+			{
+				perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				exit(1);
+			}
+			pthread_cond_wait(&condNbPacGom,&mutexNbPacGom);
+
+			valeur1 = nbPacGom / 100;
+			valeur2 = (nbPacGom - ((nbPacGom / 100) * 100)) / 10 ;
+			valeur3 = (nbPacGom - ((nbPacGom / 100) * 100) - (((nbPacGom - ((nbPacGom / 100) * 100)) / 10) * 10)) / 1;
+
+			if(pthread_mutex_unlock(&mutexNbPacGom))
+			{
+				perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				exit(1);
+			}
+
+			DessineChiffre(12,22,valeur1);
+			DessineChiffre(12,23,valeur2);
+			DessineChiffre(12,24,valeur3);
+		}
+
+		//Le jouer a gagner le niveau
+		//Incrementer le niveai de jeu
+		if(pthread_mutex_lock(&mutexNiveauJeu))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNiveauJeu\n");
+			exit(1);
+		}
+		niveauJeu++;
+		if(pthread_mutex_unlock(&mutexNiveauJeu))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n");
+			exit(1);
+		}
+		//Augmenter la vitesse du jeu
+		if(pthread_mutex_lock(&mutexDelai))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexDelai\n");
+			exit(1);
+		}
+		delai /= 2;
+		if(pthread_mutex_unlock(&mutexDelai))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexDelai\n");
+			exit(1);
+		}
+		//On place on pacGom a la case de spawn d'origine du pacGom
+		if(pthread_mutex_lock(&mutexTab))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
+			exit(1);
+		}
+		if(pthread_mutex_lock(&mutexNbPacGom))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+			exit(1);
+		}
+		tab[15][8] = PACGOM;
+		DessinePacGom(15,8);
+		nbPacGom++;
+		if(pthread_mutex_unlock(&mutexTab))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
+			exit(1);
+		}
+		if(pthread_mutex_unlock(&mutexNbPacGom))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+			exit(1);
+		}
+	}
 }
 
 void HandlerInt(int s)
