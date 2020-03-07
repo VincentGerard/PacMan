@@ -41,27 +41,33 @@ int nbPacGom;
 int delai = 300;
 int niveauJeu = 1;
 int score = 0;
+bool MAJScore = false;
 pthread_mutex_t mutexTab;
 pthread_mutex_t mutexLCDIR;
 pthread_mutex_t mutexNbPacGom;
 pthread_mutex_t mutexDelai;
 pthread_mutex_t mutexNiveauJeu;
+pthread_mutex_t mutexScore;
 
 pthread_t tidPacMan;
 pthread_t tidEvent;
 pthread_t tidPacGom;
+pthread_t tidScore;
 //Utile pour connaitre le pid? Ou pas besoin car le pid ne change pas mais si le thread demande
 //le pid avant que l'autre thread ne soit lancer on peu avoir un probleme car tid = 0
 // pthread_mutex_t mutexTidPacMan;
 // pthread_mutex_t mutexTidEvent;
 // pthread_mutex_t mutexTidPacGom;
+// pthread_mutex_t mutexTidScore;
 pthread_cond_t condNbPacGom;
+pthread_cond_t condScore;
 
 
 //Fonctions
 void* threadPacMan(void*);
 void* threadEvent(void*);
 void* threadPacGom(void*);
+void* threadScore(void*);
 void HandlerInt(int s);
 void HandlerHup(int s);
 void HandlerUsr1(int s);
@@ -151,9 +157,19 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_mutex_init sur mutexNiveauJeu\n");
 		exit(1);
 	}
+	if(pthread_mutex_init(&mutexScore,NULL))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexMAJScore\n");
+		exit(1);
+	}
 	if(pthread_cond_init(&condNbPacGom,NULL))
 	{
-		perror("Main[Erreur]pthread_cond_int sur condNbPacGom\n");
+		perror("[Main][Erreur]pthread_cond_init sur condNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_cond_init(&condScore,NULL))
+	{
+		perror("[Main][Erreur]pthread_cond_init sur condScore\n");
 		exit(1);
 	}
 
@@ -166,6 +182,8 @@ int main(int argc,char* argv[])
 	pthread_create(&tidPacMan,NULL,threadPacMan,NULL);
 	//Thread Event
 	pthread_create(&tidEvent,NULL,threadEvent,NULL);
+	//Thread Score
+	pthread_create(&tidScore,NULL,threadScore,NULL);
 
 	//Au finial ne faire un join que sur l'event
 	pthread_join(tidEvent,NULL);
@@ -183,22 +201,32 @@ int main(int argc,char* argv[])
 	}
 	if(pthread_mutex_destroy(&mutexNbPacGom))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNbPacGom\n");
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
 		exit(1);
 	}
 	if(pthread_mutex_destroy(&mutexDelai))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexDelai\n");
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexDelai\n");
 		exit(1);
 	}
 	if(pthread_mutex_destroy(&mutexNiveauJeu))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNiveauJeu\n");
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNiveauJeu\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexScore))
+	{
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexMAJScore\n");
 		exit(1);
 	}
 	if(pthread_cond_destroy(&condNbPacGom))
 	{
-		perror("Main[Erreur]pthread_cond_int sur condNbPacGom\n");
+		perror("[Main][Erreur]pthread_cond_destroy sur condNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condScore))
+	{
+		perror("[Main][Erreur]pthread_cond_destroy sur condScore\n");
 		exit(1);
 	}
 	printf("[Main][Fin]\n");
@@ -445,6 +473,19 @@ void* threadPacMan(void*)
 		if(mangerPacGom)
 		{
 			//Incrementer le score de 1
+			if(pthread_mutex_lock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				exit(1);
+			}
+			score++;
+			MAJScore = true;
+			if(pthread_mutex_unlock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				exit(1);
+			}
+			pthread_cond_signal(&condScore);
 			//Decrementer le nbPacGom de 1
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
@@ -462,6 +503,19 @@ void* threadPacMan(void*)
 		if(mangerSuperPacGom)
 		{
 			//incrementer le score de 5
+			if(pthread_mutex_lock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				exit(1);
+			}
+			score += 5;
+			MAJScore = true;
+			if(pthread_mutex_unlock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				exit(1);
+			}
+			pthread_cond_signal(&condScore);
 			//Decrementer le nbPacGom de 1
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
@@ -678,6 +732,63 @@ void* threadPacGom(void*)
 		if(pthread_mutex_unlock(&mutexNbPacGom))
 		{
 			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+			exit(1);
+		}
+	}
+}
+
+void* threadScore(void*)
+{
+	printf("[threadScore][Debut]Tid: %d\n",pthread_self());
+
+	while(1)
+	{
+		int valeur1 = 0;
+		int valeur2 = 0;
+		int valeur3 = 0;
+		int valeur4 = 0;
+		int reste = 0;
+		while(MAJScore == false)
+		{
+			if(pthread_mutex_lock(&mutexScore))
+			{
+				perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexScore");
+				exit(1);
+			}
+			pthread_cond_wait(&condScore,&mutexScore);
+
+			if(pthread_mutex_unlock(&mutexScore))
+			{
+				perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexScore");
+				exit(1);
+			}
+		}
+
+		if(pthread_mutex_lock(&mutexScore))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexScore");
+			exit(1);
+		}
+
+		reste = score;
+		valeur1 = score / 1000;
+		reste -= valeur1 * 1000;
+		valeur2 = reste / 100;
+		reste -= valeur2 * 100;
+		valeur3 = reste / 10;
+		reste -= valeur3 * 10;
+		valeur4 = reste;
+
+		DessineChiffre(16,22,valeur1);
+		DessineChiffre(16,23,valeur2);
+		DessineChiffre(16,24,valeur3);
+		DessineChiffre(16,25,valeur4);
+
+		MAJScore = false;
+
+		if(pthread_mutex_unlock(&mutexScore))
+		{
+			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexScore");
 			exit(1);
 		}
 	}
