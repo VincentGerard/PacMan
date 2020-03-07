@@ -1,6 +1,7 @@
 /*
 On dois remplir les cases (8,8)(9,8) avec des pac goms quand le joueur gagne?
 On fait reaparaitre ou les fantomes?
+Faire un fonction our avoir une case vide meilleur que la methode actuel
 */
 
 
@@ -53,12 +54,14 @@ pthread_t tidPacMan;
 pthread_t tidEvent;
 pthread_t tidPacGom;
 pthread_t tidScore;
+pthread_t tidBonus;
 //Utile pour connaitre le pid? Ou pas besoin car le pid ne change pas mais si le thread demande
 //le pid avant que l'autre thread ne soit lancer on peu avoir un probleme car tid = 0
 // pthread_mutex_t mutexTidPacMan;
 // pthread_mutex_t mutexTidEvent;
 // pthread_mutex_t mutexTidPacGom;
 // pthread_mutex_t mutexTidScore;
+// pthread_mutex_t mutexTidBonus;
 pthread_cond_t condNbPacGom;
 pthread_cond_t condScore;
 
@@ -68,6 +71,7 @@ void* threadPacMan(void*);
 void* threadEvent(void*);
 void* threadPacGom(void*);
 void* threadScore(void*);
+void* threadBonus(void*);
 void HandlerInt(int s);
 void HandlerHup(int s);
 void HandlerUsr1(int s);
@@ -184,6 +188,8 @@ int main(int argc,char* argv[])
 	pthread_create(&tidEvent,NULL,threadEvent,NULL);
 	//Thread Score
 	pthread_create(&tidScore,NULL,threadScore,NULL);
+	//Thread Bonus
+	pthread_create(&tidBonus,NULL,threadBonus,NULL);
 
 	//Au finial ne faire un join que sur l'event
 	pthread_join(tidEvent,NULL);
@@ -336,6 +342,7 @@ void* threadPacMan(void*)
 		int modifier = 0;
 		int mangerPacGom = 0;
 		int mangerSuperPacGom = 0;
+		int mangerBonus = 0;
 		int L2 = L;
 		int C2 = C;
 		//Zone critique ne pas recevoir de signal durant l'attente
@@ -367,6 +374,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L - 1][C] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L - 1][C] == BONUS)
+						mangerBonus++;
 					modifier++;
 					L2--;
 				}
@@ -376,6 +385,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[NB_LIGNE - 1][C] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[NB_LIGNE - 1][C] == BONUS)
+						mangerBonus++;
 					modifier++;
 					L2 = NB_LIGNE - 1;
 				}	
@@ -387,6 +398,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L + 1][C] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L + 1][C] == BONUS)
+						mangerBonus++;
 					modifier++;
 					L2++;
 				}
@@ -396,6 +409,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[0][C] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[0][C] == BONUS)
+						mangerBonus++;
 					modifier++;
 					L2 = 0;
 				}
@@ -407,6 +422,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L][C - 1] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L][C - 1] == BONUS)
+						mangerBonus++;
 					modifier++;
 					C2--;
 				}
@@ -416,6 +433,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L][NB_COLONNE - 1] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L][NB_COLONNE - 1] == BONUS)
+						mangerBonus++;
 					modifier++;
 					C2 = NB_COLONNE - 1;
 				}
@@ -427,6 +446,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L][C + 1] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L][C + 1] == BONUS)
+						mangerBonus++;
 					modifier++;
 					C2++;
 				}
@@ -436,6 +457,8 @@ void* threadPacMan(void*)
 						mangerPacGom++;
 					else if(tab[L][0] == SUPERPACGOM)
 						mangerSuperPacGom++;
+					else if(tab[L][0] == BONUS)
+						mangerBonus++;
 					modifier++;
 					C2 = 0;
 				}
@@ -529,6 +552,23 @@ void* threadPacMan(void*)
 				exit(1);
 			}
 			pthread_cond_signal(&condNbPacGom);
+		}
+		if(mangerBonus)
+		{
+			//incrementer le score de 30
+			if(pthread_mutex_lock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				exit(1);
+			}
+			score += 30;
+			MAJScore = true;
+			if(pthread_mutex_unlock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				exit(1);
+			}
+			pthread_cond_signal(&condScore);
 		}
 	}
 
@@ -661,8 +701,6 @@ void* threadPacGom(void*)
 		//Attendre que le joueur gagne
 		while(nbPacGom > 0)
 		{
-			printf("[threadPacGom]valeur1: %d valeur2: %d valeur3: %d\n",valeur1,valeur2,valeur3);
-
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
 				perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom");
@@ -685,6 +723,7 @@ void* threadPacGom(void*)
 			DessineChiffre(12,24,valeur3);
 		}
 
+		Debug("[threadPacGom]Partie Gagnee");
 		//Le jouer a gagner le niveau
 		//Incrementer le niveai de jeu
 		if(pthread_mutex_lock(&mutexNiveauJeu))
@@ -789,6 +828,68 @@ void* threadScore(void*)
 		if(pthread_mutex_unlock(&mutexScore))
 		{
 			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexScore");
+			exit(1);
+		}
+	}
+}
+
+void* threadBonus(void*)
+{
+	printf("[threadScore][Debut]Tid: %d\n",pthread_self());
+	srand(time(NULL));
+	int delaiMin = 10;
+	int delaiMax = 20;
+	int xMin = 0;
+	int xMax = NB_LIGNE - 1;
+	int yMin = 0;
+	int yMax = NB_COLONNE - 1;
+	int delaiBonus = 10000;
+	while(1)
+	{
+		int randX = 0;
+		int randY = 0;
+		int randNumber = delaiMin + (rand() % (delaiMax - delaiMin + 1));
+		randNumber *= 1000;
+
+		Attente(randNumber);
+
+		if(pthread_mutex_lock(&mutexTab))
+		{
+			perror("[threadBonus][Erreur]pthread_mutex_lock on mutexTab\n");
+			exit(1);
+		}
+		do
+		{
+			randX = xMin + (rand() % (xMax - xMin + 1));
+			randY = yMin + (rand() % (yMax - yMin + 1));
+		}while(tab[randX][randY] != VIDE);
+		printf("randX: %d randY: %d\n",randX,randY);
+		DessineBonus(randX,randY);
+		tab[randX][randY] = BONUS;
+
+		if(pthread_mutex_unlock(&mutexTab))
+		{
+			perror("[threadBonus][Erreur]pthread_mutex_unlock on mutexTab\n");
+			exit(1);
+		}
+
+		Attente(delaiBonus);
+
+		if(pthread_mutex_lock(&mutexTab))
+		{
+			perror("[threadBonus][Erreur]pthread_mutex_lock on mutexTab\n");
+			exit(1);
+		}
+
+		if(tab[randX][randY] == BONUS)
+		{
+			tab[randX][randY] = VIDE;
+			EffaceCarre(randX,randY);
+		}
+
+		if(pthread_mutex_unlock(&mutexTab))
+		{
+			perror("[threadBonus][Erreur]pthread_mutex_unlock on mutexTab\n");
 			exit(1);
 		}
 	}
