@@ -2,6 +2,7 @@
 On dois remplir les cases (8,8)(9,8) avec des pac goms quand le joueur gagne?
 On fait reaparaitre ou les fantomes?
 Faire un fonction our avoir une case vide meilleur que la methode actuel
+Tester les retours de toute les fonctions (pthread_create et autres)
 */
 
 
@@ -34,6 +35,16 @@ Faire un fonction our avoir une case vide meilleur que la methode actuel
 // Mes defines
 //#define DEBUG
 
+//Struct
+typedef struct 
+{
+ int L ;
+ int C ;
+ int couleur ;
+ int cache ;
+} S_FANTOME ;
+
+
 //Var global
 int L;
 int C;
@@ -43,18 +54,25 @@ int delai = 300;
 int niveauJeu = 1;
 int score = 0;
 bool MAJScore = false;
+int nbFantomesRouge = 0;
+int nbFantomesVert = 0;
+int nbFantomesMauve = 0;
+int nbFantomesOrange = 0;
+pthread_key_t key;
 pthread_mutex_t mutexTab;
 pthread_mutex_t mutexLCDIR;
 pthread_mutex_t mutexNbPacGom;
 pthread_mutex_t mutexDelai;
 pthread_mutex_t mutexNiveauJeu;
 pthread_mutex_t mutexScore;
+pthread_mutex_t mutexNbFantomes;
 
 pthread_t tidPacMan;
 pthread_t tidEvent;
 pthread_t tidPacGom;
 pthread_t tidScore;
 pthread_t tidBonus;
+pthread_t tidCompteurFantomes;
 //Utile pour connaitre le pid? Ou pas besoin car le pid ne change pas mais si le thread demande
 //le pid avant que l'autre thread ne soit lancer on peu avoir un probleme car tid = 0
 // pthread_mutex_t mutexTidPacMan;
@@ -64,6 +82,7 @@ pthread_t tidBonus;
 // pthread_mutex_t mutexTidBonus;
 pthread_cond_t condNbPacGom;
 pthread_cond_t condScore;
+pthread_cond_t condNbFantomes;
 
 
 //Fonctions
@@ -72,6 +91,8 @@ void* threadEvent(void*);
 void* threadPacGom(void*);
 void* threadScore(void*);
 void* threadBonus(void*);
+void* threadCompteurFantomes(void*);
+void* threadFantomes(void*);
 void HandlerInt(int s);
 void HandlerHup(int s);
 void HandlerUsr1(int s);
@@ -105,7 +126,7 @@ int tab[NB_LIGNE][NB_COLONNE]
 void DessineGrilleBase();
 void Attente(int milli);
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
+
 int main(int argc,char* argv[])
 {
 	EVENT_GRILLE_SDL event;
@@ -163,7 +184,12 @@ int main(int argc,char* argv[])
 	}
 	if(pthread_mutex_init(&mutexScore,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexMAJScore\n");
+		perror("[Main][Erreur]pthread_mutex_init sur mutexScore\n");
+		exit(1);
+	}
+	if(pthread_mutex_init(&mutexNbFantomes,NULL))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNbFantomes\n");
 		exit(1);
 	}
 	if(pthread_cond_init(&condNbPacGom,NULL))
@@ -176,7 +202,14 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_cond_init sur condScore\n");
 		exit(1);
 	}
+	if(pthread_cond_init(&condNbFantomes,NULL))
+	{
+		perror("[Main][Erreur]pthread_cond_init sur condNbFantomes\n");
+		exit(1);
+	}
 
+
+	pthread_key_create(&key,NULL);
 	
 
 	//Ouverture des threads
@@ -190,6 +223,8 @@ int main(int argc,char* argv[])
 	pthread_create(&tidScore,NULL,threadScore,NULL);
 	//Thread Bonus
 	pthread_create(&tidBonus,NULL,threadBonus,NULL);
+	//Thread Compteur Fantomes
+	pthread_create(&tidCompteurFantomes,NULL,threadCompteurFantomes,NULL);
 
 	//Au finial ne faire un join que sur l'event
 	pthread_join(tidEvent,NULL);
@@ -222,7 +257,12 @@ int main(int argc,char* argv[])
 	}
 	if(pthread_mutex_destroy(&mutexScore))
 	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexMAJScore\n");
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexScore\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbFantomes))
+	{
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
 		exit(1);
 	}
 	if(pthread_cond_destroy(&condNbPacGom))
@@ -235,6 +275,11 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_cond_destroy sur condScore\n");
 		exit(1);
 	}
+	if(pthread_cond_destroy(&condNbFantomes))
+	{
+		perror("[Main][Erreur]pthread_cond_destroy sur condNbFantomes\n");
+		exit(1);
+	}
 	printf("[Main][Fin]\n");
 
 	// Fermeture de la fenetre
@@ -245,7 +290,6 @@ int main(int argc,char* argv[])
 	exit(0);
 }
 
-//*********************************************************************************************
 void Attente(int milli)
 {
 	struct timespec del;
@@ -254,7 +298,6 @@ void Attente(int milli)
 	nanosleep(&del,NULL);
 }
 
-//*********************************************************************************************
 void DessineGrilleBase()
 {
 	for (int l=0 ; l<NB_LIGNE ; l++)
@@ -787,26 +830,16 @@ void* threadScore(void*)
 		int valeur3 = 0;
 		int valeur4 = 0;
 		int reste = 0;
-		while(MAJScore == false)
-		{
-			if(pthread_mutex_lock(&mutexScore))
-			{
-				perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexScore");
-				exit(1);
-			}
-			pthread_cond_wait(&condScore,&mutexScore);
-
-			if(pthread_mutex_unlock(&mutexScore))
-			{
-				perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexScore");
-				exit(1);
-			}
-		}
 
 		if(pthread_mutex_lock(&mutexScore))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexScore");
+			perror("[threadScore][Erreur]pthread_mutex_lock on mutexScore");
 			exit(1);
+		}
+
+		while(MAJScore == false)
+		{
+			pthread_cond_wait(&condScore,&mutexScore);
 		}
 
 		reste = score;
@@ -827,7 +860,7 @@ void* threadScore(void*)
 
 		if(pthread_mutex_unlock(&mutexScore))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexScore");
+			perror("[threadScore][Erreur]pthread_mutex_unlock on mutexScore");
 			exit(1);
 		}
 	}
@@ -863,7 +896,6 @@ void* threadBonus(void*)
 			randX = xMin + (rand() % (xMax - xMin + 1));
 			randY = yMin + (rand() % (yMax - yMin + 1));
 		}while(tab[randX][randY] != VIDE);
-		printf("randX: %d randY: %d\n",randX,randY);
 		DessineBonus(randX,randY);
 		tab[randX][randY] = BONUS;
 
@@ -893,6 +925,95 @@ void* threadBonus(void*)
 			exit(1);
 		}
 	}
+}
+
+void* threadCompteurFantomes(void*)
+{
+	printf("[threadCompteurFantomes][Debut]Tid: %d\n",pthread_self());
+
+	while(1)
+	{
+		if(pthread_mutex_lock(&mutexNbFantomes))
+		{
+			perror("[threadCompteurFantomes][Erreur]pthread_mutex_lock on mutexNbFantomes");
+			exit(1);
+		}
+
+		while(nbFantomesRouge == 2 && nbFantomesVert == 2 && nbFantomesOrange == 2 && nbFantomesMauve == 2)
+		{
+			pthread_cond_wait(&condNbFantomes,&mutexNbFantomes);
+		}
+
+		while(nbFantomesRouge < 2)
+		{
+			S_FANTOME* paramFantome = new S_FANTOME;
+			paramFantome->L = 9;
+			paramFantome->C = 8;
+			paramFantome->couleur = ROUGE;
+			paramFantome->cache = 0;
+			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			nbFantomesRouge++;
+		}
+		while(nbFantomesVert < 2)
+		{
+			S_FANTOME* paramFantome = new S_FANTOME;
+			paramFantome->L = 9;
+			paramFantome->C = 8;
+			paramFantome->couleur = VERT;
+			paramFantome->cache = 0;
+			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			nbFantomesVert++;
+		}
+		while(nbFantomesOrange < 2)
+		{
+			S_FANTOME* paramFantome = new S_FANTOME;
+			paramFantome->L = 9;
+			paramFantome->C = 8;
+			paramFantome->couleur = ORANGE;
+			paramFantome->cache = 0;
+			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			nbFantomesOrange++;
+		}
+		while(nbFantomesMauve < 2)
+		{
+			S_FANTOME* paramFantome = new S_FANTOME;
+			paramFantome->L = 9;
+			paramFantome->C = 8;
+			paramFantome->couleur = MAUVE;
+			paramFantome->cache = 0;
+			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			nbFantomesMauve++;
+		}
+
+		if(pthread_mutex_unlock(&mutexNbFantomes))
+		{
+			perror("[threadCompteurFantomes][Erreur]pthread_mutex_unlock on mutexNbFantomes");
+			exit(1);
+		}
+
+	}
+}
+
+void* threadFantomes(void* p)
+{
+	printf("[threadFantomes][Debut]Tid: %d\n",pthread_self());
+
+	S_FANTOME* paramFantome = (S_FANTOME*)p;
+	char couleur[10] = {0};
+	int DIR = HAUT;
+
+	if(paramFantome->couleur == ROUGE)
+		strcat(couleur,"Rouge");
+	else if(paramFantome->couleur == VERT)
+		strcat(couleur,"Vert");
+	else if(paramFantome->couleur == ORANGE)
+		strcat(couleur,"Orange");
+	else if(paramFantome->couleur == MAUVE)
+		strcat(couleur,"Mauve");
+	printf("L: %d C: %d Couleur: %s Cache: %d\n",paramFantome->L,paramFantome->C,couleur,paramFantome->cache);
+
+	pthread_setspecific(key,NULL);
+
 }
 
 void HandlerInt(int s)
