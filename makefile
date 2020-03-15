@@ -5,16 +5,17 @@ RESSOURCES=Ressources
 ECRAN=Ecran
 
 CC = g++ -DSUN -I$(ECRAN) -I$(GRILLESDL) -I$(RESSOURCES) -I /opt/guengel/include/SDL
-OBJS = $(GRILLESDL)/GrilleSDL.o $(RESSOURCES)/Ressources.o $(ECRAN)/Ecran.o
+OBJS = $(GRILLESDL)/GrilleSDL.o $(RESSOURCES)/Ressources.o #$(ECRAN)/Ecran.o
 PROGRAMS = PacMan
 
 ALL: $(PROGRAMS)
 
 PacMan:	PacMan.cpp $(OBJS)
 	echo Creation de PacMan...
-	$(CC) PacMan.cpp -o PacMan $(OBJS) -lrt -lpthread -lSDL
+	$(CC) PacMan.cpp -o PacMan $(OBJS) -lrt -lpthread -lSDL -Wall
 
 $(GRILLESDL)/GrilleSDL.o:	$(GRILLESDL)/GrilleSDL.c $(GRILLESDL)/GrilleSDL.h
+		clear
 		echo Creation de GrilleSDL.o ...
 		$(CC) -c $(GRILLESDL)/GrilleSDL.c
 		mv GrilleSDL.o $(GRILLESDL)
