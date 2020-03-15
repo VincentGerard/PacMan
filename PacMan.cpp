@@ -9,9 +9,16 @@ A Faire:
 -Bloquer les signaux lors de la modification de l'interfae graphique
 -HandlerThreadPacMan inutile
 -Refaire le changement de direction du fantome
+-Probleme de mutex sur mutexvie... besoin de lock pour lire la valeur?
 
 A ne pas oublier:
 -Na pas lock le mutex lors d'un delai
+
+Bugs:
+-Un fantome mange le pacman et il reste bloquer sur une boucle ce qui freeze le programme
+-Si 2 fantome rentre en colisier, les fantomes peuvent attendre les cases min et max du tab donc prevoir la teleportation
+=>Le fantome ne se teleporte pas et fais demi tour 
+
 */
 
 
@@ -64,10 +71,10 @@ int niveauJeu = 1;
 int score = 0;
 int mode = 1;
 bool MAJScore = false;
-int nbFantomesRouge = 1;
-int nbFantomesVert = 2;
-int nbFantomesMauve = 2;
-int nbFantomesOrange = 2;
+int nbFantomesRouge = 0;
+int nbFantomesVert = 0;
+int nbFantomesMauve = 0;
+int nbFantomesOrange = 0;
 int nbVies = 3;
 pthread_key_t key;
 pthread_mutex_t mutexTab;
@@ -77,6 +84,8 @@ pthread_mutex_t mutexDelai;
 pthread_mutex_t mutexNiveauJeu;
 pthread_mutex_t mutexScore;
 pthread_mutex_t mutexNbFantomes;
+pthread_mutex_t mutexNbVies;
+
 
 //Pas besoin de mutex car on ne va pas modifer les valeurs
 pthread_t tidPacMan;
@@ -198,6 +207,11 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_mutex_init sur mutexNbFantomes\n");
 		exit(1);
 	}
+	if(pthread_mutex_init(&mutexNbVies,NULL))
+	{
+		perror("[Main][Erreur]pthread_mutex_init sur mutexNbVies\n");
+		exit(1);
+	}
 	if(pthread_cond_init(&condNbPacGom,NULL))
 	{
 		perror("[Main][Erreur]pthread_cond_init sur condNbPacGom\n");
@@ -269,6 +283,11 @@ int main(int argc,char* argv[])
 	if(pthread_mutex_destroy(&mutexNbFantomes))
 	{
 		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbVies))
+	{
+		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbVies\n");
 		exit(1);
 	}
 	if(pthread_cond_destroy(&condNbPacGom))
@@ -1081,7 +1100,7 @@ void* threadFantomes(void* p)
 		}
 	}while(!spawnFantome);
 
-	while(1)
+	while(nbVies > 0)
 	{
 		printf("[threadFantomes: %d] Boucle\n",pthread_self());
 		newDir = 0;
@@ -1363,9 +1382,19 @@ void* threadVies(void*)
 		pthread_create(&tidPacMan,NULL,threadPacMan,NULL);
 		printf("[threadVies]pthread_create\n");
 		pthread_join(tidPacMan,NULL);
+		if(pthread_mutex_lock(&mutexNbVies))
+		{
+			perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexNbVies\n");
+			exit(1);
+		}
 		nbVies--;
 		printf("[threadVies]pthread_join\n");
 		DessineChiffre(18,22,nbVies);
+		if(pthread_mutex_unlock(&mutexNbVies))
+		{
+			perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexNbVies\n");
+			exit(1);
+		}
 	}
 
 	DessineGameOver(9,4);
