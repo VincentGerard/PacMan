@@ -1,26 +1,21 @@
 /*
 
 Questions:
--Quand le PacMan meurt,on fait reaparaitre ou les fantomes?
 -Probleme de mutex sur mutexvie... besoin de lock pour lire la valeur?
+-Quands la partie se fini on remet le mode a 1?
+
 
 A Faire:
--Tester les retours de toute les fonctions (pthread_create et autres)
--Figer les fantomes (Game Over)
+-Tester les retours de toute les fonctions (pthread_create et autres) 
 -Bloquer les signaux lors de la modification de l'interfae graphique
--HandlerThreadPacMan inutile
--Bloquer les signaux correctement (SIGALRM)
--Refaire les colisions car il y a beacoup d'erreurs
--Le mode commestible
 
 
-A ne pas oublier:
--Na pas lock le mutex lors d'un delai
+-Refaire les colision car bugs et tester si la partie est finir et laisser le pacman afficher pour la fin
 
 Bugs:
 -Lors de la fin de la game les fantomes ne freeze pas correctement donc il mange le Game Over
--Aritmetiq exception car cellui du haut redescends et bloque l'autre
--En mode commestible les fantomes me mange mais ne kill pas le pacman
+-printf [threadPacMan]Mort: -2 il se mange lui meme
+-je meurt quand je vais a droit dans le tube de tp au lieu de me tp
 
 */
 
@@ -104,6 +99,7 @@ pthread_t tidTimeOut;
 pthread_cond_t condNbPacGom;
 pthread_cond_t condScore;
 pthread_cond_t condNbFantomes;
+pthread_cond_t condMode;
 
 //Fonctions
 void* threadPacMan(void*);
@@ -119,7 +115,9 @@ void HandlerInt(int s);
 void HandlerHup(int s);
 void HandlerUsr1(int s);
 void HandlerUsr2(int s);
-void HandlerThreadPacMan(void *arg);
+void HandlerSigchld(int s);
+void HandlerAlarm(int s);
+void* TerminaisonFantomes(void* arg);
 void MonDessinePacMan(int l,int c,int dir);
 void Debug(const char * format, ...);
 void AfficheTab(void);
@@ -238,6 +236,11 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_cond_init sur condNbFantomes\n");
 		exit(1);
 	}
+	if(pthread_cond_init(&condMode,NULL))
+	{
+		perror("[Main][Erreur]pthread_cond_init sur condMode\n");
+		exit(1);
+	}
 
 
 	pthread_key_create(&key,NULL);
@@ -321,6 +324,11 @@ int main(int argc,char* argv[])
 		perror("[Main][Erreur]pthread_cond_destroy sur condNbFantomes\n");
 		exit(1);
 	}
+	if(pthread_cond_destroy(&condMode))
+	{
+		perror("[Main][Erreur]pthread_cond_destroy sur condMode\n");
+		exit(1);
+	}
 	printf("[Main][Fin]\n");
 
 	// Fermeture de la fenetre
@@ -383,14 +391,16 @@ void* threadPacMan(void*)
 	sigaction(SIGUSR2,&A4,NULL);
 	//sigalrm pas de handler
 	struct sigaction A5;
-	A5.sa_handler = NULL;
+	A5.sa_handler = HandlerAlarm;
 	A5.sa_flags = 0;
 	sigemptyset(&A5.sa_mask);
 	sigaction(SIGALRM,&A5,NULL);
-	
-
-	//La fonction lorsque la thread meurt
-	//pthread_cleanup_push(HandlerThreadPacMan,NULL);
+	//sigchild
+	struct sigaction A6;
+	A6.sa_handler = HandlerSigchld;
+	A6.sa_flags = 0;
+	sigemptyset(&A6.sa_mask);
+	sigaction(SIGCHLD,&A6,NULL);
 
 	//Cancel du thread quand il meurt
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,&etat);
@@ -439,15 +449,12 @@ void* threadPacMan(void*)
 	}
 
 	sigemptyset(&mask3);
-	sigaction(SIGINT,&A1,NULL);
-	sigaction(SIGHUP,&A2,NULL);
-	sigaction(SIGUSR1,&A3,NULL);
-	sigaction(SIGUSR2,&A4,NULL);
+	sigaddset(&mask3,SIGCHLD);
+	sigaddset(&mask3,SIGALRM);
 	sigprocmask(SIG_SETMASK,&mask3,NULL);
 
 	while(1)
 	{
-		//printf("[threadPacMan]Boucle\n");
 		int modifier = 0;
 		int mangerPacGom = 0;
 		int mangerSuperPacGom = 0;
@@ -462,10 +469,8 @@ void* threadPacMan(void*)
 		Attente(delai);
 
 		sigemptyset(&mask3);
-		sigaction(SIGINT,&A1,NULL);
-		sigaction(SIGHUP,&A2,NULL);
-		sigaction(SIGUSR1,&A3,NULL);
-		sigaction(SIGUSR2,&A4,NULL);
+		sigaddset(&mask3,SIGCHLD);
+		sigaddset(&mask3,SIGALRM);
 		sigprocmask(SIG_SETMASK,&mask3,NULL);
 
 		if(pthread_mutex_lock(&mutexTab))
@@ -495,6 +500,11 @@ void* threadPacMan(void*)
 						printf("[threadPacMan]Mort: %d\n",tab[L - 1][C]);
 						mort++;
 					}
+					else if(tab[L - 1][C] != VIDE && mode == 2)
+					{
+						printf("[threadPacMan]Manger Fantome: %d\n",tab[L - 1][C]);
+						pthread_kill(tab[L - 1][C],SIGCHLD);
+					}
 					modifier++;
 					L2--;
 				}
@@ -519,10 +529,15 @@ void* threadPacMan(void*)
 						mangerSuperPacGom++;
 					else if(tab[L + 1][C] == BONUS)
 						mangerBonus++;
-					else if(tab[L + 1][C] != VIDE)
+					else if(tab[L + 1][C] != VIDE && mode == 1)
 					{
 						printf("[threadPacMan]Mort: %d\n",tab[L + 1][C]);
 						mort++;
+					}
+					else if(tab[L + 1][C] != VIDE && mode == 2)
+					{
+						printf("[threadPacMan]Manger Fantome: %d\n",tab[L + 1][C]);
+						pthread_kill(tab[L + 1][C],SIGCHLD);
 					}
 					modifier++;
 					L2++;
@@ -548,10 +563,15 @@ void* threadPacMan(void*)
 						mangerSuperPacGom++;
 					else if(tab[L][C - 1] == BONUS)
 						mangerBonus++;
-					else if(tab[L][C - 1] != VIDE)
+					else if(tab[L][C - 1] != VIDE && mode == 1)
 					{
 						printf("[threadPacMan]Mort: %d\n",tab[L][C - 1]);
 						mort++;
+					}
+					else if(tab[L][C - 1] != VIDE && mode == 2)
+					{
+						printf("[threadPacMan]Manger Fantome: %d\n",tab[L][C - 1]);
+						pthread_kill(tab[L][C - 1],SIGCHLD);
 					}
 					modifier++;
 					C2--;
@@ -577,10 +597,15 @@ void* threadPacMan(void*)
 						mangerSuperPacGom++;
 					else if(tab[L][C + 1] == BONUS)
 						mangerBonus++;
-					else if(tab[L][C + 1] != VIDE)
+					else if(tab[L][C + 1] != VIDE && mode == 1)
 					{
 						printf("[threadPacMan]Mort: %d\n",tab[L][C + 1]);
 						mort++;
+					}
+					else if(tab[L][C + 1] != VIDE && mode == 2)
+					{
+						printf("[threadPacMan]Manger Fantome: %d\n",tab[L][C + 1]);
+						pthread_kill(tab[L][C + 1],SIGCHLD);
 					}
 					modifier++;
 					C2++;
@@ -598,6 +623,12 @@ void* threadPacMan(void*)
 				}
 				break;
 		}
+
+		if(pthread_mutex_unlock(&mutexMode))
+		{
+			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexMode\n");
+			exit(1);
+		}
 		
 		if(modifier && !mort)
 		{
@@ -610,10 +641,8 @@ void* threadPacMan(void*)
 			MonDessinePacMan(L2,C2,DIR);
 
 			sigemptyset(&mask3);
-			sigaction(SIGINT,&A1,NULL);
-			sigaction(SIGHUP,&A2,NULL);
-			sigaction(SIGUSR1,&A3,NULL);
-			sigaction(SIGUSR2,&A4,NULL);
+			sigaddset(&mask3,SIGCHLD);
+			sigaddset(&mask3,SIGALRM);
 			sigprocmask(SIG_SETMASK,&mask3,NULL);
 		}
 		if(mangerPacGom && !mort)
@@ -678,7 +707,18 @@ void* threadPacMan(void*)
 			//Fantomes Comestibles
 			if((res = alarm(0)) == 0)
 			{
+				if(pthread_mutex_lock(&mutexMode))
+				{
+					perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexMode\n");
+					exit(1);
+				}
 				mode = 2;
+				if(pthread_mutex_unlock(&mutexMode))
+				{
+					perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexMode\n");
+					exit(1);
+				}
+				pthread_cond_signal(&condMode);
 				printf("[threadPacMan]Res = %d\n",res);
 				printf("[threadPacMan]Mode = 2\n");
 				
@@ -689,10 +729,9 @@ void* threadPacMan(void*)
 			else
 			{
 				printf("[threadPacMan]Res = %d\n",res);
-				pthread_cancel(tidTimeOut);
+				pthread_kill(tidTimeOut,SIGQUIT);
 				printf("[threadPacMan]pthread_cancel tidTimeOut\n");
 				pthread_create(&tidTimeOut,NULL,threadTimeOut,&res);
-
 			}
 		}
 		if(mangerBonus && !mort)
@@ -721,11 +760,6 @@ void* threadPacMan(void*)
 		if(pthread_mutex_unlock(&mutexTab))
 		{
 			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
-			exit(1);
-		}
-		if(pthread_mutex_unlock(&mutexMode))
-		{
-			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexMode\n");
 			exit(1);
 		}
 		pthread_testcancel();
@@ -1057,6 +1091,21 @@ void* threadCompteurFantomes(void*)
 
 	while(1)
 	{
+		if(pthread_mutex_lock(&mutexMode))
+		{
+			perror("[threadCompteurFantomes][Erreur]pthread_mutex_lock on mutexMode");
+			exit(1);
+		}
+		while(mode == 2)
+		{
+			pthread_cond_wait(&condMode,&mutexMode);
+		}
+		if(pthread_mutex_unlock(&mutexMode))
+		{
+			perror("[threadCompteurFantomes][Erreur]pthread_mutex_unlock on mutexMode");
+			exit(1);
+		}
+
 		if(pthread_mutex_lock(&mutexNbFantomes))
 		{
 			perror("[threadCompteurFantomes][Erreur]pthread_mutex_lock on mutexNbFantomes");
@@ -1076,7 +1125,7 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = ROUGE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
-			printf("[threadCompteurFantomes]Fantome  Rouge ++\n");
+			printf("[threadCompteurFantomes]Fantome ROUGE ++\n");
 			nbFantomesRouge++;
 		}
 		while(nbFantomesVert < 2)
@@ -1087,6 +1136,7 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = VERT;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			printf("[threadCompteurFantomes]Fantome VERT ++\n");
 			nbFantomesVert++;
 		}
 		while(nbFantomesOrange < 2)
@@ -1097,6 +1147,7 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = ORANGE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			printf("[threadCompteurFantomes]Fantome ORANGE ++\n");
 			nbFantomesOrange++;
 		}
 		while(nbFantomesMauve < 2)
@@ -1107,6 +1158,7 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = MAUVE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
+			printf("[threadCompteurFantomes]Fantome MAUVE ++\n");
 			nbFantomesMauve++;
 		}
 
@@ -1115,7 +1167,6 @@ void* threadCompteurFantomes(void*)
 			perror("[threadCompteurFantomes][Erreur]pthread_mutex_unlock on mutexNbFantomes");
 			exit(1);
 		}
-
 	}
 }
 
@@ -1125,6 +1176,7 @@ void* threadFantomes(void* p)
 
 	sigset_t maskFantomes;
 	sigfillset(&maskFantomes);
+	sigdelset(&maskFantomes,SIGCHLD);
 	sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 
 	srand(time(NULL));
@@ -1156,7 +1208,8 @@ void* threadFantomes(void* p)
 	else if(pFantome->couleur == MAUVE)
 		strcat(couleur,"Mauve");
 
-	pthread_setspecific(key,NULL);
+	pthread_setspecific(key,pFantome);
+	pthread_cleanup_push(TerminaisonFantomes,NULL);
 
 	do
 	{
@@ -1168,7 +1221,20 @@ void* threadFantomes(void* p)
 		if(tab[9][8] == VIDE && tab[8][8] == VIDE)
 		{
 			pFantome->cache = VIDE;
-			DessineFantome(pFantome->L,pFantome->C,pFantome->couleur,dirFantome);
+			if(pthread_mutex_lock(&mutexMode))
+			{
+				perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexMode\n");
+				exit(1);
+			}
+			if(mode == 1)
+				DessineFantome(pFantome->L,pFantome->C,pFantome->couleur,dirFantome);
+			else
+				DessineFantomeComestible(pFantome->L,pFantome->C);
+			if(pthread_mutex_unlock(&mutexMode))
+			{
+				perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexMode\n");
+				exit(1);
+			}
 			tab[pFantome->L][pFantome->C] = pthread_self();
 			spawnFantome = 1;
 			//printf("[threadFantomes: %d]Fantome place a L: %d C: %d\n",pthread_self(),pFantome->L,pFantome->C);
@@ -1437,6 +1503,9 @@ void* threadFantomes(void* p)
 		}
 		Attente(delai * (5 / 3));
 	}
+	pthread_cleanup_pop(0);
+	pthread_kill(tidCompteurFantomes,SIGQUIT);
+	pthread_exit(NULL);
 }
 
 void* threadVies(void*)
@@ -1495,28 +1564,10 @@ void* threadTimeOut(void* param)
 	if(param)
 	{
 		time += *(int*)param;
-		printf("[threadTimeOut]Res = %d\n",time);
 	}
 
 	alarm(time);
-
 	pause();
-
-	if(pthread_mutex_lock(&mutexMode))
-	{
-		perror("[threadTimeOut][Erreur]pthread_mutex_lock on mutexMode\n");
-		exit(1);
-	}
-	mode = 1;
-	printf("[threadTimeOut: %d]Mode = 1\n",pthread_self());
-	if(pthread_mutex_unlock(&mutexMode))
-	{
-		perror("[threadTimeOut][Erreur]pthread_mutex_unlock on mutexMode\n");
-		exit(1);
-	}
-
-	printf("[threadTimeOut: %d][Fin]\n",pthread_self());
-	pthread_exit(0);
 }
 
 void HandlerInt(int s)
@@ -1599,11 +1650,134 @@ void HandlerUsr2(int s)
 	}
 }
 
-void HandlerThreadPacMan(void *arg)
+void HandlerSigchld(int s)
 {
-	system("clear");
-	printf("[HandlerThreadPacMan] PacMan est mort!");
-	exit(1);
+	// printf("[HandlerSigchld]\n");
+	pthread_exit(NULL);
+}
+
+void HandlerAlarm(int s)
+{
+	// printf("[HandlerAlarm: %d][Debut]\n",pthread_self());
+
+	if(pthread_mutex_lock(&mutexMode))
+	{
+		perror("[threadTimeOut][Erreur]pthread_mutex_lock on mutexMode\n");
+		exit(1);
+	}
+	mode = 1;
+	if(pthread_mutex_unlock(&mutexMode))
+	{
+		perror("[threadTimeOut][Erreur]pthread_mutex_unlock on mutexMode\n");
+		exit(1);
+	}
+	pthread_cond_signal(&condMode);
+	// printf("[threadTimeOut: %d]Mode = 1\n",pthread_self());
+	
+
+	// printf("[threadTimeOut: %d][Fin]\n",pthread_self());
+	// printf("[HandlerAlarm: %d][Fin]\n",pthread_self());
+	pthread_exit(0);
+}
+
+void* TerminaisonFantomes(void* arg)
+{
+	//Incrementer le score de 50
+	if(pthread_mutex_lock(&mutexScore))
+	{
+		perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexScore");
+		exit(1);
+	}
+	score += 50;
+	MAJScore = true;
+	if(pthread_mutex_unlock(&mutexScore))
+	{
+		perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexScore");
+		exit(1);
+	}
+	//Incrementer le contenu du cach
+	S_FANTOME* pFantome = NULL;
+	pFantome = (S_FANTOME*)pthread_getspecific(key);
+	if(pFantome == NULL)
+	{
+		printf("[TerminaisonFantomes]pFantome == NULL\n");
+		exit(1);
+	}
+
+	switch(pFantome->cache)
+	{
+		case VIDE:
+			break;
+		case PACGOM:
+			if(pthread_mutex_lock(&mutexNbVies))
+			{
+				perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexNbVies");
+				exit(1);
+			}
+			nbPacGom--;
+			if(pthread_mutex_unlock(&mutexNbVies))
+			{
+				perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexNbVies");
+				exit(1);
+			}
+			break;
+		case SUPERPACGOM:
+			if(pthread_mutex_lock(&mutexNbVies))
+			{
+				perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexNbVies");
+				exit(1);
+			}
+			nbPacGom--;
+			if(pthread_mutex_unlock(&mutexNbVies))
+			{
+				perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexNbVies");
+				exit(1);
+			}
+			break;
+		case BONUS:
+			if(pthread_mutex_lock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				exit(1);
+			}
+			score += 30;
+			if(pthread_mutex_unlock(&mutexScore))
+			{
+				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				exit(1);
+			}
+			break;
+		default:
+			printf("[TerminaisonFantomes]switch(pFantome->cache) default\n");
+			break;
+	}
+	//Reveiller le threadScore
+	pthread_cond_signal(&condScore);
+	//Reveille le threadNbPacGom
+	pthread_cond_signal(&condNbPacGom);
+
+	//Decrementer le bon fantome
+	if(pthread_mutex_lock(&mutexNbFantomes))
+	{
+		perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbFantomes");
+		exit(1);
+	}
+	// printf("[TerminaisonFantomes]couleur = %d\n",pFantome->couleur);
+	if(pFantome->couleur == ROUGE)
+		nbFantomesRouge--;
+	else if(pFantome->couleur == VERT)
+		nbFantomesVert--;
+	else if(pFantome->couleur == ORANGE)
+		nbFantomesOrange--;
+	else if(pFantome->couleur == MAUVE)
+		nbFantomesMauve--;
+	pthread_cond_signal(&condNbFantomes);
+	if(pthread_mutex_unlock(&mutexNbFantomes))
+	{
+		perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbFantomes");
+		exit(1);
+	}
+	pthread_exit(NULL);
 }
 
 void MonDessinePacMan(int l,int c,int dir)
