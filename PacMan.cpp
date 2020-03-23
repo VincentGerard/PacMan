@@ -1,15 +1,3 @@
-/*
-
-A Faire:
--Bloquer les signaux lors de la modification de l'interfae graphique
--DessinePacgom/pacm attente section critique
-
-Bugs:
-
-*/
-
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -1305,6 +1293,9 @@ void* threadFantomes(void* p)
 			exit(1);
 		}
 
+		sigfillset(&maskFantomes);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 		//Restitution du Cache
 		switch(pFantome->cache)
 		{
@@ -1329,6 +1320,11 @@ void* threadFantomes(void* p)
 				exit(1);
 				break;
 		}
+
+		sigfillset(&maskFantomes);
+		sigdelset(&maskFantomes,SIGCHLD);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 		tab[pFantome->L][pFantome->C] = newTabVal;
 		
 		//Mouvement
@@ -1380,7 +1376,16 @@ void* threadFantomes(void* p)
 				printf("[threadFantomes][Erreur]pthread_mutex_unlock on mutexMode\n");
 				exit(1);
 			}
+
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 			EffaceCarre(nextL,nextC);
+
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 			pthread_cancel(tidPacMan);
 		}
 
@@ -1478,11 +1483,29 @@ void* threadFantomes(void* p)
 		//Afficher le fantome
 		if(mode == 1)
 		{
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+			
 			DessineFantome(pFantome->L,pFantome->C,pFantome->couleur,dirFantome);
+			
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+			pthread_cancel(tidPacMan);
 		}
 		else if(mode == 2)
 		{
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 			DessineFantomeComestible(pFantome->L,pFantome->C);
+
+			sigfillset(&maskFantomes);
+			sigdelset(&maskFantomes,SIGCHLD);
+			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+			pthread_cancel(tidPacMan);
 		}
 		
 		tab[pFantome->L][pFantome->C] = pthread_self();
