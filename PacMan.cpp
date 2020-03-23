@@ -1,21 +1,10 @@
 /*
 
-Questions:
--Probleme de mutex sur mutexvie... besoin de lock pour lire la valeur?
--Quands la partie se fini on remet le mode a 1?
-
-
 A Faire:
--Tester les retours de toute les fonctions (pthread_create et autres) 
 -Bloquer les signaux lors de la modification de l'interfae graphique
-
-
--Refaire les colision car bugs et tester si la partie est finir et laisser le pacman afficher pour la fin
+-DessinePacgom/pacm attente section critique
 
 Bugs:
--Lors de la fin de la game les fantomes ne freeze pas correctement donc il mange le Game Over
--printf [threadPacMan]Mort: -2 il se mange lui meme
--je meurt quand je vais a droit dans le tube de tp au lieu de me tp
 
 */
 
@@ -164,7 +153,7 @@ int main(int argc,char* argv[])
 	DessineGrilleBase();
 
 	//Debut de notre prog
-	printf("[Main][Debut]Pid: %d\n",getpid());
+	printf("[Main: %d][Debut]",getpid());
 
 	//Masquer les signaux
 	sigset_t mask;
@@ -176,194 +165,73 @@ int main(int argc,char* argv[])
 	sigaddset(&mask,SIGALRM);
 	sigprocmask(SIG_SETMASK,&mask,NULL);
 
+	//Init des mutex et variable de conditions
 	if(pthread_mutex_init(&mutexTab,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexTab\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexTab\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexLCDIR,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexLCDIR\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexLCDIR\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexNbPacGom,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNbPacGom\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexNbPacGom\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexDelai,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexDelai\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexDelai\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexNiveauJeu,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNiveauJeu\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexNiveauJeu\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexScore,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexScore\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexScore\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexNbFantomes,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNbFantomes\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexNbFantomes\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexNbVies,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexNbVies\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexNbVies\n",getpid());
 		exit(1);
 	}
 	if(pthread_mutex_init(&mutexMode,NULL))
 	{
-		perror("[Main][Erreur]pthread_mutex_init sur mutexMode\n");
+		printf("[Main: %d][Erreur]pthread_mutex_init sur mutexMode\n",getpid());
 		exit(1);
 	}
 	if(pthread_cond_init(&condNbPacGom,NULL))
 	{
-		perror("[Main][Erreur]pthread_cond_init sur condNbPacGom\n");
+		printf("[Main: %d][Erreur]pthread_cond_init sur condNbPacGom\n",getpid());
 		exit(1);
 	}
 	if(pthread_cond_init(&condScore,NULL))
 	{
-		perror("[Main][Erreur]pthread_cond_init sur condScore\n");
+		printf("[Main: %d][Erreur]pthread_cond_init sur condScore\n",getpid());
 		exit(1);
 	}
 	if(pthread_cond_init(&condNbFantomes,NULL))
 	{
-		perror("[Main][Erreur]pthread_cond_init sur condNbFantomes\n");
+		printf("[Main: %d][Erreur]pthread_cond_init sur condNbFantomes\n",getpid());
 		exit(1);
 	}
 	if(pthread_cond_init(&condMode,NULL))
 	{
-		perror("[Main][Erreur]pthread_cond_init sur condMode\n");
+		printf("[Main: %d][Erreur]pthread_cond_init sur condMode\n",getpid());
 		exit(1);
 	}
 
-
-	pthread_key_create(&key,NULL);
-	
-
-	//Ouverture des threads
-	//Thread PacGom
-	pthread_create(&tidPacGom,NULL,threadPacGom,NULL);
-	//Thread Vies
-	pthread_create(&tidThreadVie,NULL,threadVies,NULL);
-	//Thread Event
-	pthread_create(&tidEvent,NULL,threadEvent,NULL);
-	//Thread Score
-	pthread_create(&tidScore,NULL,threadScore,NULL);
-	//Thread Bonus
-	pthread_create(&tidBonus,NULL,threadBonus,NULL);
-	//Thread Compteur Fantomes
-	pthread_create(&tidCompteurFantomes,NULL,threadCompteurFantomes,NULL);
-
-	//Au finial ne faire un join que sur l'event
-	pthread_join(tidEvent,NULL);
-
-	//Fin de notre prog
-	if(pthread_mutex_destroy(&mutexTab))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy on mutexTab\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexLCDIR))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy on mutexLCDIR\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexNbPacGom))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexDelai))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexDelai\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexNiveauJeu))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNiveauJeu\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexScore))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexScore\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexNbFantomes))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexNbVies))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexNbVies\n");
-		exit(1);
-	}
-	if(pthread_mutex_destroy(&mutexMode))
-	{
-		perror("[Main][Erreur]pthread_mutex_destroy sur mutexMode\n");
-		exit(1);
-	}
-	if(pthread_cond_destroy(&condNbPacGom))
-	{
-		perror("[Main][Erreur]pthread_cond_destroy sur condNbPacGom\n");
-		exit(1);
-	}
-	if(pthread_cond_destroy(&condScore))
-	{
-		perror("[Main][Erreur]pthread_cond_destroy sur condScore\n");
-		exit(1);
-	}
-	if(pthread_cond_destroy(&condNbFantomes))
-	{
-		perror("[Main][Erreur]pthread_cond_destroy sur condNbFantomes\n");
-		exit(1);
-	}
-	if(pthread_cond_destroy(&condMode))
-	{
-		perror("[Main][Erreur]pthread_cond_destroy sur condMode\n");
-		exit(1);
-	}
-	printf("[Main][Fin]\n");
-
-	// Fermeture de la fenetre
-	printf("(MAIN %d) Fermeture de la fenetre graphique...",pthread_self()); fflush(stdout);
-	FermetureFenetreGraphique();
-	printf("OK\n"); fflush(stdout);
-
-	exit(0);
-}
-
-void Attente(int milli)
-{
-	struct timespec del;
-	del.tv_sec = milli/1000;
-	del.tv_nsec = (milli%1000)*1000000;
-	nanosleep(&del,NULL);
-}
-
-void DessineGrilleBase()
-{
-	for (int l=0 ; l<NB_LIGNE ; l++)
-		for (int c=0 ; c<NB_COLONNE ; c++)
-		{
-		if (tab[l][c] == VIDE) EffaceCarre(l,c);
-		if (tab[l][c] == MUR) DessineMur(l,c);
-		}
-}
-
-void* threadPacMan(void*)
-{
-	Debug("[threadPacMan][Debut]Tid: %d\n",pthread_self());
-
-	int res = 0;
-	int etat;
-	bool spawnPacman = false;
 	//Armement des signaux sur tout le processus
 	//sigint
 	struct sigaction A1;
@@ -402,16 +270,163 @@ void* threadPacMan(void*)
 	sigemptyset(&A6.sa_mask);
 	sigaction(SIGCHLD,&A6,NULL);
 
-	//Cancel du thread quand il meurt
+
+	if(pthread_key_create(&key,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_key_create\n",pthread_self());
+		exit(1);
+	}
+
+	//Ouverture des threads
+	if(pthread_create(&tidPacGom,NULL,threadPacGom,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadPacGom\n",pthread_self());
+		exit(1);
+	}
+	if(pthread_create(&tidThreadVie,NULL,threadVies,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadVies\n",pthread_self());
+		exit(1);
+	}
+	if(pthread_create(&tidEvent,NULL,threadEvent,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadEvent\n",pthread_self());
+		exit(1);
+	}
+	if(pthread_create(&tidScore,NULL,threadScore,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadScore\n",pthread_self());
+		exit(1);
+	}
+	if(pthread_create(&tidBonus,NULL,threadBonus,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadBonus\n",pthread_self());
+		exit(1);
+	}
+	if(pthread_create(&tidCompteurFantomes,NULL,threadCompteurFantomes,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_create on threadFantomes\n",pthread_self());
+		exit(1);
+	}
+
+	if(pthread_join(tidEvent,NULL))
+	{
+		printf("[Main: %d][Erreur]pthread_join on threadEvent\n",pthread_self());
+		exit(1);
+	}
+
+	//Fin de notre prog
+	//Destroy des mutex et variable de conditions
+	if(pthread_mutex_destroy(&mutexTab))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy on mutexTab\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexLCDIR))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy on mutexLCDIR\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbPacGom))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexDelai))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexDelai\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNiveauJeu))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexNiveauJeu\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexScore))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexScore\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbFantomes))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexNbVies))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexNbVies\n");
+		exit(1);
+	}
+	if(pthread_mutex_destroy(&mutexMode))
+	{
+		printf("[Main][Erreur]pthread_mutex_destroy sur mutexMode\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condNbPacGom))
+	{
+		printf("[Main][Erreur]pthread_cond_destroy sur condNbPacGom\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condScore))
+	{
+		printf("[Main][Erreur]pthread_cond_destroy sur condScore\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condNbFantomes))
+	{
+		printf("[Main][Erreur]pthread_cond_destroy sur condNbFantomes\n");
+		exit(1);
+	}
+	if(pthread_cond_destroy(&condMode))
+	{
+		printf("[Main][Erreur]pthread_cond_destroy sur condMode\n");
+		exit(1);
+	}
+	printf("[Main: %d][Fin]\n",pthread_self());
+
+	// Fermeture de la fenetre
+	printf("(MAIN %d) Fermeture de la fenetre graphique...",pthread_self()); fflush(stdout);
+	FermetureFenetreGraphique();
+	printf("OK\n"); fflush(stdout);
+
+	exit(0);
+}
+
+void Attente(int milli)
+{
+	struct timespec del;
+	del.tv_sec = milli/1000;
+	del.tv_nsec = (milli%1000)*1000000;
+	nanosleep(&del,NULL);
+}
+
+void DessineGrilleBase()
+{
+	for (int l=0 ; l<NB_LIGNE ; l++)
+		for (int c=0 ; c<NB_COLONNE ; c++)
+		{
+		if (tab[l][c] == VIDE) EffaceCarre(l,c);
+		if (tab[l][c] == MUR) DessineMur(l,c);
+		}
+}
+
+void* threadPacMan(void*)
+{
+	Debug("[threadPacMan: %d][Debut]\n",pthread_self());
+
+	int res = 0;
+	int etat;
+	bool spawnPacman = false;
+	sigset_t maskPacMan;
+	
+	//Etablier le mode de fermeture du thread
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,&etat);
 	pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,&etat);
 
-	//Mask
-	sigset_t mask3;
-
+	//Configurer le pacman
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexLCDIR\n",pthread_self());
 		exit(1);
 	}
 	L = 15;
@@ -419,18 +434,19 @@ void* threadPacMan(void*)
 	DIR = GAUCHE;
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexLCDIR\n",pthread_self());
 		exit(1);
 	}
 
-	sigfillset(&mask3);
-	sigprocmask(SIG_SETMASK,&mask3,NULL);
+	//Zone critique ne pas recevoir de signal durant l'attente et la zone graphique
+	sigfillset(&maskPacMan);
+	sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 	while(!spawnPacman)
 	{
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(tab[L][C] == VIDE)
@@ -441,17 +457,17 @@ void* threadPacMan(void*)
 		if(pthread_mutex_unlock(&mutexTab))
 		{
 
-			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		Attente(delai);
-		//printf("[threadPacMan]Boucle Spawn\n");
 	}
+	printf("[threadPacMan: %d][Info]PacMan a spawn L = %d C = %d\n",pthread_self(),L,C);
 
-	sigemptyset(&mask3);
-	sigaddset(&mask3,SIGCHLD);
-	sigaddset(&mask3,SIGALRM);
-	sigprocmask(SIG_SETMASK,&mask3,NULL);
+	sigemptyset(&maskPacMan);
+	sigaddset(&maskPacMan,SIGCHLD);
+	sigaddset(&maskPacMan,SIGALRM);
+	sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 	while(1)
 	{
@@ -463,24 +479,24 @@ void* threadPacMan(void*)
 		int C2 = C;
 		int mort = 0;
 		//Zone critique ne pas recevoir de signal durant l'attente
-		sigfillset(&mask3);
-		sigprocmask(SIG_SETMASK,&mask3,NULL);
+		sigfillset(&maskPacMan);
+		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 		Attente(delai);
 
-		sigemptyset(&mask3);
-		sigaddset(&mask3,SIGCHLD);
-		sigaddset(&mask3,SIGALRM);
-		sigprocmask(SIG_SETMASK,&mask3,NULL);
+		sigemptyset(&maskPacMan);
+		sigaddset(&maskPacMan,SIGCHLD);
+		sigaddset(&maskPacMan,SIGALRM);
+		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_lock(&mutexMode))
 		{
-			perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexMode\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexMode\n",pthread_self());
 			exit(1);
 		}
 
@@ -497,12 +513,12 @@ void* threadPacMan(void*)
 						mangerBonus++;
 					else if(tab[L - 1][C] != VIDE && mode == 1)
 					{
-						printf("[threadPacMan]Mort: %d\n",tab[L - 1][C]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L - 1][C]);
 						mort++;
 					}
 					else if(tab[L - 1][C] != VIDE && mode == 2)
 					{
-						printf("[threadPacMan]Manger Fantome: %d\n",tab[L - 1][C]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L - 1][C]);
 						pthread_kill(tab[L - 1][C],SIGCHLD);
 					}
 					modifier++;
@@ -531,12 +547,12 @@ void* threadPacMan(void*)
 						mangerBonus++;
 					else if(tab[L + 1][C] != VIDE && mode == 1)
 					{
-						printf("[threadPacMan]Mort: %d\n",tab[L + 1][C]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L + 1][C]);
 						mort++;
 					}
 					else if(tab[L + 1][C] != VIDE && mode == 2)
 					{
-						printf("[threadPacMan]Manger Fantome: %d\n",tab[L + 1][C]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L + 1][C]);
 						pthread_kill(tab[L + 1][C],SIGCHLD);
 					}
 					modifier++;
@@ -565,12 +581,12 @@ void* threadPacMan(void*)
 						mangerBonus++;
 					else if(tab[L][C - 1] != VIDE && mode == 1)
 					{
-						printf("[threadPacMan]Mort: %d\n",tab[L][C - 1]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L][C - 1]);
 						mort++;
 					}
 					else if(tab[L][C - 1] != VIDE && mode == 2)
 					{
-						printf("[threadPacMan]Manger Fantome: %d\n",tab[L][C - 1]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L][C - 1]);
 						pthread_kill(tab[L][C - 1],SIGCHLD);
 					}
 					modifier++;
@@ -599,12 +615,12 @@ void* threadPacMan(void*)
 						mangerBonus++;
 					else if(tab[L][C + 1] != VIDE && mode == 1)
 					{
-						printf("[threadPacMan]Mort: %d\n",tab[L][C + 1]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L][C + 1]);
 						mort++;
 					}
 					else if(tab[L][C + 1] != VIDE && mode == 2)
 					{
-						printf("[threadPacMan]Manger Fantome: %d\n",tab[L][C + 1]);
+						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L][C + 1]);
 						pthread_kill(tab[L][C + 1],SIGCHLD);
 					}
 					modifier++;
@@ -626,81 +642,99 @@ void* threadPacMan(void*)
 
 		if(pthread_mutex_unlock(&mutexMode))
 		{
-			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexMode\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexMode\n",pthread_self());
 			exit(1);
+		}
+
+		if(mort)
+		{
+			pthread_testcancel();
+
+			sigfillset(&maskPacMan);
+			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+
+			EffaceCarre(L,C);
+
+			sigemptyset(&maskPacMan);
+			sigaddset(&maskPacMan,SIGCHLD);
+			sigaddset(&maskPacMan,SIGALRM);
+			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+
+			tab[L][C] = VIDE;
+			if(pthread_mutex_unlock(&mutexTab))
+			{
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
+				exit(1);
+			}
+			pthread_cancel(tidPacMan);
 		}
 		
 		if(modifier && !mort)
 		{
-			sigfillset(&mask3);
-			sigprocmask(SIG_SETMASK,&mask3,NULL);
+			sigfillset(&maskPacMan);
+			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 			tab[L][C] = VIDE;
-			//Section Critique Interface graphique
 			EffaceCarre(L,C);
 			MonDessinePacMan(L2,C2,DIR);
 
-			sigemptyset(&mask3);
-			sigaddset(&mask3,SIGCHLD);
-			sigaddset(&mask3,SIGALRM);
-			sigprocmask(SIG_SETMASK,&mask3,NULL);
+			sigemptyset(&maskPacMan);
+			sigaddset(&maskPacMan,SIGCHLD);
+			sigaddset(&maskPacMan,SIGALRM);
+			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 		}
 		if(mangerPacGom && !mort)
 		{
-			//Incrementer le score de 1
 			if(pthread_mutex_lock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 				exit(1);
 			}
 			score++;
 			MAJScore = true;
 			if(pthread_mutex_unlock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 				exit(1);
 			}
 			pthread_cond_signal(&condScore);
-			//Decrementer le nbPacGom de 1
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
 			if(pthread_mutex_unlock(&mutexNbPacGom))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			pthread_cond_signal(&condNbPacGom);
 		}
 		if(mangerSuperPacGom && !mort)
 		{
-			//incrementer le score de 5
 			if(pthread_mutex_lock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 				exit(1);
 			}
 			score += 5;
 			MAJScore = true;
 			if(pthread_mutex_unlock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 				exit(1);
 			}
 			pthread_cond_signal(&condScore);
-			//Decrementer le nbPacGom de 1
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
 			if(pthread_mutex_unlock(&mutexNbPacGom))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			pthread_cond_signal(&condNbPacGom);
@@ -709,57 +743,50 @@ void* threadPacMan(void*)
 			{
 				if(pthread_mutex_lock(&mutexMode))
 				{
-					perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexMode\n");
+					printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexMode\n",pthread_self());
 					exit(1);
 				}
 				mode = 2;
 				if(pthread_mutex_unlock(&mutexMode))
 				{
-					perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexMode\n");
+					printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexMode\n",pthread_self());
 					exit(1);
 				}
 				pthread_cond_signal(&condMode);
-				printf("[threadPacMan]Res = %d\n",res);
-				printf("[threadPacMan]Mode = 2\n");
 				
-				//Lancer le threadTimeOut
-				//Thread TimeOut
-				pthread_create(&tidTimeOut,NULL,threadTimeOut,NULL);
+				if(pthread_create(&tidTimeOut,NULL,threadTimeOut,NULL))
+				{
+					printf("[threadPacMan: %d][Erreur]pthread_create on threadTimeOut\n",pthread_self());
+					exit(1);
+				}
 			}
 			else
 			{
-				printf("[threadPacMan]Res = %d\n",res);
+				//Si une alarm est deja en cours on l'arrete et recupere le nombre de secondes restantes
 				pthread_kill(tidTimeOut,SIGQUIT);
-				printf("[threadPacMan]pthread_cancel tidTimeOut\n");
 				pthread_create(&tidTimeOut,NULL,threadTimeOut,&res);
 			}
 		}
 		if(mangerBonus && !mort)
 		{
-			//incrementer le score de 30
 			if(pthread_mutex_lock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 				exit(1);
 			}
 			score += 30;
 			MAJScore = true;
 			if(pthread_mutex_unlock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 				exit(1);
 			}
 			pthread_cond_signal(&condScore);
 		}
-		if(mort)
-		{
-			EffaceCarre(L,C);
-			pthread_cancel(tidPacMan);
-		}
 
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		pthread_testcancel();
@@ -768,7 +795,7 @@ void* threadPacMan(void*)
 
 void* threadEvent(void*)
 {
-	printf("[threadEvent][Debut]Tid: %d\n",pthread_self());
+	printf("[threadEvent: %d][Debut]\n",pthread_self());
 
 	//On bloque les signaux dans le threadEvent pour pas les envoyer a sois meme
 	sigset_t maskEvent;
@@ -791,19 +818,19 @@ void* threadEvent(void*)
 				{
 					case KEY_UP:
 						kill(getpid(),SIGUSR1);
-						Debug("[threadEvent]SIGUSR1\n");
+						Debug("[threadEvent: %d][Info]Reception SIGUSR1\n",pthread_self());
 						break;
 					case KEY_DOWN:
 						kill(getpid(),SIGUSR2);
-						Debug("[threadEvent]SIGUSR2\n");
+						Debug("[threadEvent: %d][Info]Reception SIGUSR2\n",pthread_self());
 						break;
 					case KEY_LEFT:
 						kill(getpid(),SIGINT);
-						Debug("[threadEvent]SIGINT\n");
+						Debug("[threadEvent: %d][Info]Reception SIGINT\n",pthread_self());
 						break;
 					case KEY_RIGHT:
 						kill(getpid(),SIGHUP);
-						Debug("[threadEvent]SIGHUP\n");
+						Debug("[threadEvent: %d][Info]Reception SIGHUP\n",pthread_self());
 						break;
 				}
 				break;
@@ -813,7 +840,7 @@ void* threadEvent(void*)
 
 void* threadPacGom(void*)
 {
-	printf("[threadPacGom][Debut]Tid: %d\n",pthread_self());
+	printf("[threadPacGom: %d][Debut]\n",pthread_self());
 
 	sigset_t maskPacgom;
 	sigfillset(&maskPacgom);
@@ -828,12 +855,12 @@ void* threadPacGom(void*)
 		//Init PacGom
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_lock(&mutexNbPacGom))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexNbPacGom\n",pthread_self());
 			exit(1);
 		}
 		for(int x = 0; x < NB_LIGNE; x++)
@@ -863,26 +890,26 @@ void* threadPacGom(void*)
 
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}	
 
 		if(pthread_mutex_unlock(&mutexNbPacGom))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom\n",pthread_self());
 			exit(1);
 		}
 
 		//Afficher le niveau de jeu
 		if(pthread_mutex_lock(&mutexNiveauJeu))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNiveauJeu\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexNiveauJeu\n",pthread_self());
 			exit(1);
 		}
 		DessineChiffre(14,22,niveauJeu);
 		if(pthread_mutex_unlock(&mutexNiveauJeu))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n",pthread_self());
 			exit(1);
 		}
 
@@ -891,7 +918,7 @@ void* threadPacGom(void*)
 		{
 			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
-				perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom");
+				printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			pthread_cond_wait(&condNbPacGom,&mutexNbPacGom);
@@ -902,7 +929,7 @@ void* threadPacGom(void*)
 
 			if(pthread_mutex_unlock(&mutexNbPacGom))
 			{
-				perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom");
+				printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 
@@ -912,40 +939,40 @@ void* threadPacGom(void*)
 		}
 
 		Debug("[threadPacGom]Partie Gagnee");
-		//Le jouer a gagner le niveau
+
 		//Incrementer le niveai de jeu
 		if(pthread_mutex_lock(&mutexNiveauJeu))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNiveauJeu\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexNiveauJeu\n",pthread_self());
 			exit(1);
 		}
 		niveauJeu++;
 		if(pthread_mutex_unlock(&mutexNiveauJeu))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexNiveauJeu\n",pthread_self());
 			exit(1);
 		}
 		//Augmenter la vitesse du jeu
 		if(pthread_mutex_lock(&mutexDelai))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexDelai\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexDelai\n",pthread_self());
 			exit(1);
 		}
 		delai /= 2;
 		if(pthread_mutex_unlock(&mutexDelai))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexDelai\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexDelai\n",pthread_self());
 			exit(1);
 		}
-		//On place on pacGom a la case de spawn d'origine du pacGom
+		//On place un pacgom a la case d'origine du pacman
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_lock(&mutexNbPacGom))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_lock on mutexNbPacGom\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_lock on mutexNbPacGom\n",pthread_self());
 			exit(1);
 		}
 		tab[15][8] = PACGOM;
@@ -953,12 +980,12 @@ void* threadPacGom(void*)
 		nbPacGom++;
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_unlock(&mutexNbPacGom))
 		{
-			perror("[threadPacGom][Erreur]pthread_mutex_unlock on mutexNbPacGom\n");
+			printf("[threadPacGom: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom\n",pthread_self());
 			exit(1);
 		}
 	}
@@ -966,7 +993,7 @@ void* threadPacGom(void*)
 
 void* threadScore(void*)
 {
-	printf("[threadScore][Debut]Tid: %d\n",pthread_self());
+	printf("[threadScore: %d][Debut]\n",pthread_self());
 
 	sigset_t maskScore;
 	sigfillset(&maskScore);
@@ -982,7 +1009,7 @@ void* threadScore(void*)
 
 		if(pthread_mutex_lock(&mutexScore))
 		{
-			perror("[threadScore][Erreur]pthread_mutex_lock on mutexScore");
+			printf("[threadScore: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 			exit(1);
 		}
 
@@ -1009,7 +1036,7 @@ void* threadScore(void*)
 
 		if(pthread_mutex_unlock(&mutexScore))
 		{
-			perror("[threadScore][Erreur]pthread_mutex_unlock on mutexScore");
+			printf("[threadScore: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 			exit(1);
 		}
 	}
@@ -1017,7 +1044,7 @@ void* threadScore(void*)
 
 void* threadBonus(void*)
 {
-	printf("[threadScore][Debut]Tid: %d\n",pthread_self());
+	printf("[threadScore: %d][Debut]\n",pthread_self());
 
 	sigset_t maskBonus;
 	sigfillset(&maskBonus);
@@ -1031,6 +1058,7 @@ void* threadBonus(void*)
 	int yMin = 0;
 	int yMax = NB_COLONNE - 1;
 	int delaiBonus = 10000;
+
 	while(1)
 	{
 		int randX = 0;
@@ -1042,7 +1070,7 @@ void* threadBonus(void*)
 
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadBonus][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadBonus: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		do
@@ -1055,7 +1083,7 @@ void* threadBonus(void*)
 
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadBonus][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadBonus: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 
@@ -1063,7 +1091,7 @@ void* threadBonus(void*)
 
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadBonus][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadBonus: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 
@@ -1075,7 +1103,7 @@ void* threadBonus(void*)
 
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadBonus][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadBonus: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 	}
@@ -1083,7 +1111,7 @@ void* threadBonus(void*)
 
 void* threadCompteurFantomes(void*)
 {
-	printf("[threadCompteurFantomes][Debut]Tid: %d\n",pthread_self());
+	printf("[threadCompteurFantomes: %d][Debut]\n",pthread_self());
 
 	sigset_t maskComptFantomes;
 	sigfillset(&maskComptFantomes);
@@ -1093,7 +1121,7 @@ void* threadCompteurFantomes(void*)
 	{
 		if(pthread_mutex_lock(&mutexMode))
 		{
-			perror("[threadCompteurFantomes][Erreur]pthread_mutex_lock on mutexMode");
+			printf("[threadCompteurFantomes: %d][Erreur]pthread_mutex_lock on mutexMode",pthread_self());
 			exit(1);
 		}
 		while(mode == 2)
@@ -1102,13 +1130,13 @@ void* threadCompteurFantomes(void*)
 		}
 		if(pthread_mutex_unlock(&mutexMode))
 		{
-			perror("[threadCompteurFantomes][Erreur]pthread_mutex_unlock on mutexMode");
+			printf("[threadCompteurFantomes: %d][Erreur]pthread_mutex_unlock on mutexMode",pthread_self());
 			exit(1);
 		}
 
 		if(pthread_mutex_lock(&mutexNbFantomes))
 		{
-			perror("[threadCompteurFantomes][Erreur]pthread_mutex_lock on mutexNbFantomes");
+			printf("[threadCompteurFantomes: %d][Erreur]pthread_mutex_lock on mutexNbFantomes",pthread_self());
 			exit(1);
 		}
 
@@ -1125,7 +1153,6 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = ROUGE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
-			printf("[threadCompteurFantomes]Fantome ROUGE ++\n");
 			nbFantomesRouge++;
 		}
 		while(nbFantomesVert < 2)
@@ -1136,7 +1163,6 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = VERT;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
-			printf("[threadCompteurFantomes]Fantome VERT ++\n");
 			nbFantomesVert++;
 		}
 		while(nbFantomesOrange < 2)
@@ -1147,7 +1173,6 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = ORANGE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
-			printf("[threadCompteurFantomes]Fantome ORANGE ++\n");
 			nbFantomesOrange++;
 		}
 		while(nbFantomesMauve < 2)
@@ -1158,21 +1183,21 @@ void* threadCompteurFantomes(void*)
 			paramFantome->couleur = MAUVE;
 			paramFantome->cache = 0;
 			pthread_create(NULL,NULL,threadFantomes,paramFantome);
-			printf("[threadCompteurFantomes]Fantome MAUVE ++\n");
 			nbFantomesMauve++;
 		}
 
 		if(pthread_mutex_unlock(&mutexNbFantomes))
 		{
-			perror("[threadCompteurFantomes][Erreur]pthread_mutex_unlock on mutexNbFantomes");
+			printf("[threadCompteurFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbFantomes",pthread_self());
 			exit(1);
 		}
 	}
 }
 
+
 void* threadFantomes(void* p)
 {
-	printf("[threadFantomes][Debut]Tid: %d\n",pthread_self());
+	printf("[threadFantomes: %d][Debut]\n",pthread_self());
 
 	sigset_t maskFantomes;
 	sigfillset(&maskFantomes);
@@ -1188,7 +1213,6 @@ void* threadFantomes(void* p)
 	int spawnFantome = 0;
 	int newDir = 0;
 	int changeDir = 0;
-	int fuirePacman = 0;
 	int tuerPacman = 0;
 	int continuer = 0;
 	int newTabVal = 0;
@@ -1215,7 +1239,7 @@ void* threadFantomes(void* p)
 	{
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(tab[9][8] == VIDE && tab[8][8] == VIDE)
@@ -1223,7 +1247,7 @@ void* threadFantomes(void* p)
 			pFantome->cache = VIDE;
 			if(pthread_mutex_lock(&mutexMode))
 			{
-				perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexMode\n");
+				printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexMode\n",pthread_self());
 				exit(1);
 			}
 			if(mode == 1)
@@ -1232,29 +1256,32 @@ void* threadFantomes(void* p)
 				DessineFantomeComestible(pFantome->L,pFantome->C);
 			if(pthread_mutex_unlock(&mutexMode))
 			{
-				perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexMode\n");
+				printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexMode\n",pthread_self());
 				exit(1);
 			}
 			tab[pFantome->L][pFantome->C] = pthread_self();
 			spawnFantome = 1;
-			//printf("[threadFantomes: %d]Fantome place a L: %d C: %d\n",pthread_self(),pFantome->L,pFantome->C);
 		}
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 	}while(!spawnFantome);
+
+	sigfillset(&maskFantomes);
+	sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 	Attente(delai * (5 / 3));
+
+	sigfillset(&maskFantomes);
+	sigdelset(&maskFantomes,SIGCHLD);
+	sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 
 	while(nbVies > 0)
 	{
-		//printf("[threadFantomes: %d]Boucle\n",pthread_self());
-		//system("clear");
-		//AfficheTab();
 		newDir = 0;
 		tuerPacman = 0;
-		fuirePacman = 0;
 		continuer = 0;
 		nextL = 0;
 		nextC = 0;
@@ -1269,12 +1296,12 @@ void* threadFantomes(void* p)
 
 		if(pthread_mutex_lock(&mutexTab))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexTab\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_lock(&mutexMode))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexMode\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexMode\n",pthread_self());
 			exit(1);
 		}
 
@@ -1298,7 +1325,7 @@ void* threadFantomes(void* p)
 				newTabVal = BONUS;
 				break;
 			default:
-				printf("[threadFantomes: %d][Erreur]Switch cache: %d\n",pthread_self(),pFantome->cache);
+				printf("[threadFantomes: %d][Erreur]Switch(cache): %d\n",pthread_self(),pFantome->cache);
 				exit(1);
 				break;
 		}
@@ -1310,54 +1337,18 @@ void* threadFantomes(void* p)
 			case HAUT:
 				nextL = pFantome->L - 1;
 				nextC = pFantome->C;
-
-				if(mode == 1 && tab[nextL][nextC] == PACMAN)
-					tuerPacman++;
-				else if(mode == 2 && tab[nextL][nextC] == PACMAN)
-					changeDir++;
-				else if(tab[nextL][nextC] == VIDE || tab[nextL][nextC] == PACGOM || tab[nextL][nextC] == SUPERPACGOM || tab[nextL][nextC] == BONUS)
-					continuer++;
-				else
-					changeDir++;
 				break;
 			case BAS:
 				nextL = pFantome->L + 1;
 				nextC = pFantome->C;
-
-				if(mode == 1 && tab[nextL][nextC] == PACMAN)
-					tuerPacman++;
-				else if(mode == 2 && tab[nextL][nextC] == PACMAN)
-					changeDir++;
-				else if(tab[nextL][nextC] == VIDE || tab[nextL][nextC] == PACGOM || tab[nextL][nextC] == SUPERPACGOM || tab[nextL][nextC] == BONUS)
-					continuer++;
-				else
-					changeDir++;
 				break;
 			case GAUCHE:
 				nextL = pFantome->L;
 				nextC = pFantome->C - 1;
-
-				if(mode == 1 && tab[nextL][nextC] == PACMAN)
-					tuerPacman++;
-				else if(mode == 2 && tab[nextL][nextC] == PACMAN)
-					changeDir++;
-				else if(tab[nextL][nextC] == VIDE || tab[nextL][nextC] == PACGOM || tab[nextL][nextC] == SUPERPACGOM || tab[nextL][nextC] == BONUS)
-					continuer++;
-				else
-					changeDir++;
 				break;
 			case DROITE:
 				nextL = pFantome->L;
 				nextC = pFantome->C + 1;
-
-				if(mode == 1 && tab[nextL][nextC] == PACMAN)
-					tuerPacman++;
-				else if(mode == 2 && tab[nextL][nextC] == PACMAN)
-					changeDir++;
-				else if(tab[nextL][nextC] == VIDE || tab[nextL][nextC] == PACGOM || tab[nextL][nextC] == SUPERPACGOM || tab[nextL][nextC] == BONUS)
-					continuer++;
-				else
-					changeDir++;
 				break;
 			default:
 				printf("[threadFantomes: %d][Erreur]Switch(dirFantome): %d\n",pthread_self(),dirFantome);
@@ -1365,34 +1356,48 @@ void* threadFantomes(void* p)
 				break;
 		}
 
+		if(mode == 1 && tab[nextL][nextC] == PACMAN)
+			tuerPacman++;
+		else if(mode == 2 && tab[nextL][nextC] == PACMAN)
+			changeDir++;
+		else if(tab[nextL][nextC] == VIDE || tab[nextL][nextC] == PACGOM || tab[nextL][nextC] == SUPERPACGOM || tab[nextL][nextC] == BONUS)
+			continuer++;
+		else
+			changeDir++;
+
 		if(tuerPacman)
 		{
-			//printf("[threadFantomes: %d]tuerPacman\n",pthread_self());
-			pthread_cancel(tidPacMan);
-			// EffaceCarre(nextL,nextC);
 			tab[nextL][nextC] = VIDE;
-			//Le cache est forcement vide car le fantome a manger le pacgom/superPacgom/Bonus
 			pFantome->L = nextL;
 			pFantome->C = nextC;
+			if(pthread_mutex_unlock(&mutexTab))
+			{
+				printf("[threadFantomes][Erreur]pthread_mutex_unlock on mutexTab\n");
+				exit(1);
+			}
+			if(pthread_mutex_unlock(&mutexMode))
+			{
+				printf("[threadFantomes][Erreur]pthread_mutex_unlock on mutexMode\n");
+				exit(1);
+			}
+			EffaceCarre(nextL,nextC);
+			pthread_cancel(tidPacMan);
 		}
 
 		if(continuer)
 		{
-			//printf("[threadFantomes: %d]continuer\n",pthread_self());
 			pFantome->L = nextL;
 			pFantome->C = nextC;
 		}
 
 		if(changeDir)
 		{
-			// printf("[threadFantomes: %d]changeDir\n",pthread_self());
 			//Recupere le nombre de cases vides
 			if(tab[pFantome->L - 1][pFantome->C] == VIDE || tab[pFantome->L - 1][pFantome->C] == PACGOM || tab[pFantome->L - 1][pFantome->C] == SUPERPACGOM || tab[pFantome->L - 1][pFantome->C] == BONUS)
 			{
 				for(int i = 0; i < 4; i++)
 					if(vect[i] == 0)
 					{
-						// printf("[threadFantomes: %d]Ajout HAUT\n",pthread_self());
 						vect[i] = HAUT;
 						i = 4;
 					}
@@ -1402,7 +1407,6 @@ void* threadFantomes(void* p)
 				for(int i = 0; i < 4; i++)
 					if(vect[i] == 0)
 					{
-						// printf("[threadFantomes: %d]Ajout BAS\n",pthread_self());
 						vect[i] = BAS;
 						i = 4;
 					}
@@ -1412,7 +1416,6 @@ void* threadFantomes(void* p)
 				for(int i = 0; i < 4; i++)
 					if(vect[i] == 0)
 					{
-						// printf("[threadFantomes: %d]Ajout GAUCHE\n",pthread_self());
 						vect[i] = GAUCHE;
 						i = 4;
 					}
@@ -1422,7 +1425,6 @@ void* threadFantomes(void* p)
 				for(int i = 0; i < 4; i++)
 					if(vect[i] == 0)
 					{
-						// printf("[threadFantomes: %d]Ajout DROITE\n",pthread_self());
 						vect[i] = DROITE;
 						i = 4;
 					}
@@ -1440,17 +1442,14 @@ void* threadFantomes(void* p)
 				max--;
 			}
 
-			// printf("[threadFantomes: %d]Min = %d Max = %d\n",pthread_self(),min,max);
 
 			if(max == 0 && vect[0] == 0)
 			{
-				// printf("[threadFantomes: %d]Bloquer\n",pthread_self());
 				bloquer++;
 			}
 
 			while(!newDirOk && !bloquer)
 			{
-				// printf("[threadFantomes: %d]newDirOk\n",pthread_self());
 				newDir = min + rand() % (max - min + 1);
 				newDir = vect[newDir];
 				for(int i = 0; i < 4; i++)
@@ -1473,19 +1472,16 @@ void* threadFantomes(void* p)
 			}
 		}
 
-		//Choper le cache
+		//Recuperer le cache
 		pFantome->cache = tab[pFantome->L][pFantome->C];
-
 
 		//Afficher le fantome
 		if(mode == 1)
 		{
-			//Dessin normal
 			DessineFantome(pFantome->L,pFantome->C,pFantome->couleur,dirFantome);
 		}
 		else if(mode == 2)
 		{
-			//Dessin bleu
 			DessineFantomeComestible(pFantome->L,pFantome->C);
 		}
 		
@@ -1493,15 +1489,23 @@ void* threadFantomes(void* p)
 	
 		if(pthread_mutex_unlock(&mutexTab))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexTab\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
 			exit(1);
 		}
 		if(pthread_mutex_unlock(&mutexMode))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexMode\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexMode\n",pthread_self());
 			exit(1);
 		}
+
+		sigfillset(&maskFantomes);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 		Attente(delai * (5 / 3));
+
+		sigfillset(&maskFantomes);
+		sigdelset(&maskFantomes,SIGCHLD);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 	}
 	pthread_cleanup_pop(0);
 	pthread_kill(tidCompteurFantomes,SIGQUIT);
@@ -1510,7 +1514,7 @@ void* threadFantomes(void* p)
 
 void* threadVies(void*)
 {
-	printf("[threadVies][Debut]Tid: %d\n",pthread_self());
+	printf("[threadVies: %d][Debut]\n",pthread_self());
 
 	sigset_t maskVies;
 	sigfillset(&maskVies);
@@ -1526,29 +1530,30 @@ void* threadVies(void*)
 		pthread_join(tidPacMan,NULL);
 		if(pthread_mutex_lock(&mutexNbVies))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_lock on mutexNbVies\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies\n",pthread_self());
 			exit(1);
 		}
 		nbVies--;
-		//printf("[threadVies]pthread_join\n");
 		DessineChiffre(18,22,nbVies);
 		if(pthread_mutex_unlock(&mutexNbVies))
 		{
-			perror("[threadFantomes][Erreur]pthread_mutex_unlock on mutexNbVies\n");
+			printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies\n",pthread_self());
 			exit(1);
 		}
 	}
 
+	//Ce delais permet d'etre sur que les fantomes sont bien figer
+	//car sinon ils peuvent panger le game over
+	Attente(delai);
+
 	DessineGameOver(9,4);
-	//Figer les fantomes
-	
-	//Le pacMan meurt fin de la game
+
 	pthread_exit(NULL);
 }
 
 void* threadTimeOut(void* param)
 {
-	printf("[threadTimeOut][Debut]Tid: %d\n",pthread_self());
+	printf("[threadTimeOut: %d][Debut]\n",pthread_self());
 	
 	sigset_t maskTimeout;
 	sigfillset(&maskTimeout);
@@ -1568,6 +1573,7 @@ void* threadTimeOut(void* param)
 
 	alarm(time);
 	pause();
+	pthread_exit(NULL);
 }
 
 void HandlerInt(int s)
@@ -1575,7 +1581,7 @@ void HandlerInt(int s)
 	Debug("[HandlerInt]SIGINT\n");
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[HandlerInt][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[HandlerInt][Erreur]pthread_mutex_lock on mutexLCDIR\n");
 		exit(1);
 	}
 	if(tab[L][C - 1] != MUR)
@@ -1585,7 +1591,7 @@ void HandlerInt(int s)
 	}
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[HandlerInt][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[HandlerInt][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
 		exit(1);
 	}
 }
@@ -1595,7 +1601,7 @@ void HandlerHup(int s)
 	Debug("[HandlerHup]SIGHUP\n");
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[HandlerHup][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[HandlerHup][Erreur]pthread_mutex_lock on mutexLCDIR\n");
 		exit(1);
 	}
 	if(tab[L][C + 1] != MUR)
@@ -1605,7 +1611,7 @@ void HandlerHup(int s)
 	}
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[HandlerHup][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[HandlerHup][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
 		exit(1);
 	}
 }
@@ -1615,7 +1621,7 @@ void HandlerUsr1(int s)
 	Debug("[HandlerUsr1]SIGUSR1\n");
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[HandlerUsr1][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[HandlerUsr1][Erreur]pthread_mutex_lock on mutexLCDIR\n");
 		exit(1);
 	}
 	if(tab[L - 1][C] != MUR)
@@ -1625,7 +1631,7 @@ void HandlerUsr1(int s)
 	}
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[HandlerUsr1][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[HandlerUsr1][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
 		exit(1);
 	}
 }
@@ -1635,7 +1641,7 @@ void HandlerUsr2(int s)
 	Debug("[HandlerUsr2]SIGUSR2\n");
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[HandlerUsr2][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[HandlerUsr2][Erreur]pthread_mutex_lock on mutexLCDIR\n");
 		exit(1);
 	}
 	if(tab[L + 1][C] != MUR)
@@ -1645,7 +1651,7 @@ void HandlerUsr2(int s)
 	}
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[HandlerUsr2][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[HandlerUsr2][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
 		exit(1);
 	}
 }
@@ -1658,25 +1664,19 @@ void HandlerSigchld(int s)
 
 void HandlerAlarm(int s)
 {
-	// printf("[HandlerAlarm: %d][Debut]\n",pthread_self());
-
 	if(pthread_mutex_lock(&mutexMode))
 	{
-		perror("[threadTimeOut][Erreur]pthread_mutex_lock on mutexMode\n");
+		printf("[threadTimeOut][Erreur]pthread_mutex_lock on mutexMode\n");
 		exit(1);
 	}
 	mode = 1;
 	if(pthread_mutex_unlock(&mutexMode))
 	{
-		perror("[threadTimeOut][Erreur]pthread_mutex_unlock on mutexMode\n");
+		printf("[threadTimeOut][Erreur]pthread_mutex_unlock on mutexMode\n");
 		exit(1);
 	}
 	pthread_cond_signal(&condMode);
-	// printf("[threadTimeOut: %d]Mode = 1\n",pthread_self());
-	
 
-	// printf("[threadTimeOut: %d][Fin]\n",pthread_self());
-	// printf("[HandlerAlarm: %d][Fin]\n",pthread_self());
 	pthread_exit(0);
 }
 
@@ -1685,22 +1685,22 @@ void* TerminaisonFantomes(void* arg)
 	//Incrementer le score de 50
 	if(pthread_mutex_lock(&mutexScore))
 	{
-		perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexScore");
+		printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 		exit(1);
 	}
 	score += 50;
 	MAJScore = true;
 	if(pthread_mutex_unlock(&mutexScore))
 	{
-		perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexScore");
+		printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 		exit(1);
 	}
-	//Incrementer le contenu du cach
+	//Incrementer le socre avec le contenu du cach
 	S_FANTOME* pFantome = NULL;
 	pFantome = (S_FANTOME*)pthread_getspecific(key);
 	if(pFantome == NULL)
 	{
-		printf("[TerminaisonFantomes]pFantome == NULL\n");
+		printf("[TerminaisonFantomes: %d]pFantome == NULL\n",pthread_self());
 		exit(1);
 	}
 
@@ -1711,44 +1711,45 @@ void* TerminaisonFantomes(void* arg)
 		case PACGOM:
 			if(pthread_mutex_lock(&mutexNbVies))
 			{
-				perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexNbVies");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
 			if(pthread_mutex_unlock(&mutexNbVies))
 			{
-				perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexNbVies");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies",pthread_self());
 				exit(1);
 			}
 			break;
 		case SUPERPACGOM:
 			if(pthread_mutex_lock(&mutexNbVies))
 			{
-				perror("[TerminaisonFantomes][Erreur]pthread_mutex_lock on mutexNbVies");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
 			if(pthread_mutex_unlock(&mutexNbVies))
 			{
-				perror("[TerminaisonFantomes][Erreur]pthread_mutex_unlock on mutexNbVies");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies",pthread_self());
 				exit(1);
 			}
 			break;
 		case BONUS:
 			if(pthread_mutex_lock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexScore");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexScore",pthread_self());
 				exit(1);
 			}
 			score += 30;
+			MAJScore = true;
 			if(pthread_mutex_unlock(&mutexScore))
 			{
-				perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexScore");
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexScore",pthread_self());
 				exit(1);
 			}
 			break;
 		default:
-			printf("[TerminaisonFantomes]switch(pFantome->cache) default\n");
+			printf("[TerminaisonFantomes: %d]switch(pFantome->cache) default\n",pthread_self());
 			break;
 	}
 	//Reveiller le threadScore
@@ -1759,7 +1760,7 @@ void* TerminaisonFantomes(void* arg)
 	//Decrementer le bon fantome
 	if(pthread_mutex_lock(&mutexNbFantomes))
 	{
-		perror("[threadPacMan][Erreur]pthread_mutex_lock on mutexNbFantomes");
+		printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbFantomes",pthread_self());
 		exit(1);
 	}
 	// printf("[TerminaisonFantomes]couleur = %d\n",pFantome->couleur);
@@ -1774,7 +1775,7 @@ void* TerminaisonFantomes(void* arg)
 	pthread_cond_signal(&condNbFantomes);
 	if(pthread_mutex_unlock(&mutexNbFantomes))
 	{
-		perror("[threadPacMan][Erreur]pthread_mutex_unlock on mutexNbFantomes");
+		printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbFantomes",pthread_self());
 		exit(1);
 	}
 	pthread_exit(NULL);
@@ -1782,23 +1783,20 @@ void* TerminaisonFantomes(void* arg)
 
 void MonDessinePacMan(int l,int c,int dir)
 {
-	//Debug("[MonDessinePacMan]l = %d,c = %d,dir = %d",l,c,dir);
 	
-	//Section Critique Interface graphique
 	DessinePacMan(l,c,dir);
-	//Section critique tab
 	tab[l][c] = PACMAN;
 
 	if(pthread_mutex_lock(&mutexLCDIR))
 	{
-		perror("[MonDessinePacMan][Erreur]pthread_mutex_lock on mutexLCDIR\n");
+		printf("[MonDessinePacMan][Erreur]pthread_mutex_lock on mutexLCDIR\n");
 		exit(1);
 	}
 	L = l;
 	C = c;
 	if(pthread_mutex_unlock(&mutexLCDIR))
 	{
-		perror("[MonDessinePacMan][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
+		printf("[MonDessinePacMan][Erreur]pthread_mutex_unlock on mutexLCDIR\n");
 		exit(1);
 	}
 }
@@ -1823,7 +1821,7 @@ void AfficheTab(void)
 {
 	if(pthread_mutex_lock(&mutexTab))
 	{
-		perror("[AfficheTab][Erreur]pthread_mutex_lock on mutexTab\n");
+		printf("[AfficheTab][Erreur]pthread_mutex_lock on mutexTab\n");
 		exit(1);
 	}
 	for(int i = 0; i < NB_LIGNE; i++)
@@ -1836,12 +1834,9 @@ void AfficheTab(void)
 	}
 	if(pthread_mutex_unlock(&mutexTab))
 	{
-		perror("[AfficheTab][Erreur]pthread_mutex_unlock on mutexTab\n");
+		printf("[AfficheTab][Erreur]pthread_mutex_unlock on mutexTab\n");
 		exit(1);
 	}
 }
-
-
-
 
 
