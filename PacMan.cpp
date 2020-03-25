@@ -1756,28 +1756,28 @@ void* TerminaisonFantomes(void* arg)
 		case VIDE:
 			break;
 		case PACGOM:
-			if(pthread_mutex_lock(&mutexNbVies))
+			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
-				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies",pthread_self());
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
-			if(pthread_mutex_unlock(&mutexNbVies))
+			if(pthread_mutex_unlock(&mutexNbPacGom))
 			{
-				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies",pthread_self());
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			break;
 		case SUPERPACGOM:
-			if(pthread_mutex_lock(&mutexNbVies))
+			if(pthread_mutex_lock(&mutexNbPacGom))
 			{
-				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies",pthread_self());
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_lock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			nbPacGom--;
-			if(pthread_mutex_unlock(&mutexNbVies))
+			if(pthread_mutex_unlock(&mutexNbPacGom))
 			{
-				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies",pthread_self());
+				printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbPacGom",pthread_self());
 				exit(1);
 			}
 			break;
