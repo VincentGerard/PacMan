@@ -1819,12 +1819,12 @@ void* TerminaisonFantomes(void* arg)
 		nbFantomesOrange--;
 	else if(pFantome->couleur == MAUVE)
 		nbFantomesMauve--;
-	pthread_cond_signal(&condNbFantomes);
 	if(pthread_mutex_unlock(&mutexNbFantomes))
 	{
 		printf("[TerminaisonFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbFantomes",pthread_self());
 		exit(1);
 	}
+	pthread_cond_signal(&condNbFantomes);
 	pthread_exit(NULL);
 }
 
