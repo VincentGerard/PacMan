@@ -24,7 +24,7 @@
 #define CENTREE 8
 
 // Mes defines
-//#define DEBUG
+// #define DEBUG
 
 //Struct
 typedef struct 
@@ -41,7 +41,7 @@ int L;
 int C;
 int DIR;
 int nbPacGom;
-int delai = 200;
+int delai = 300;
 int niveauJeu = 1;
 int score = 0;
 int mode = 1;
@@ -130,7 +130,7 @@ int main(int argc,char* argv[])
 	srand((unsigned)time(NULL));
 
 	// Ouverture de la fenetre graphique
-	printf("(MAIN %d) Ouverture de la fenetre graphique\n",pthread_self()); fflush(stdout);
+	printf("[Main: %d]Ouverture de la fenetre graphique\n",pthread_self()); fflush(stdout);
 	if (OuvertureFenetreGraphique() < 0)
 	{
 		printf("Erreur de OuvrirGrilleSDL\n");
@@ -145,13 +145,46 @@ int main(int argc,char* argv[])
 
 	//Masquer les signaux
 	sigset_t mask;
-	sigemptyset(&mask);
-	sigaddset(&mask,SIGUSR1);
-	sigaddset(&mask,SIGUSR2);
-	sigaddset(&mask,SIGHUP);
-	sigaddset(&mask,SIGINT);
-	sigaddset(&mask,SIGALRM);
+	sigfillset(&mask);
 	sigprocmask(SIG_SETMASK,&mask,NULL);
+
+	//Armement des signaux sur tout le processus
+	//sigint
+	struct sigaction A1;
+	A1.sa_handler = HandlerInt;
+	A1.sa_flags = 0;
+	sigemptyset(&A1.sa_mask);
+	sigaction(SIGINT,&A1,NULL);
+	//sighup
+	struct sigaction A2;
+	A2.sa_handler = HandlerHup;
+	A2.sa_flags = 0;
+	sigemptyset(&A2.sa_mask);
+	sigaction(SIGHUP,&A2,NULL);
+	//sigusr1
+	struct sigaction A3;
+	A3.sa_handler = HandlerUsr1;
+	A3.sa_flags = 0;
+	sigemptyset(&A3.sa_mask);
+	sigaction(SIGUSR1,&A3,NULL);
+	//sigusr2
+	struct sigaction A4;
+	A4.sa_handler = HandlerUsr2;
+	A4.sa_flags = 0;
+	sigemptyset(&A4.sa_mask);
+	sigaction(SIGUSR2,&A4,NULL);
+	//sigalrm pas de handler
+	struct sigaction A5;
+	A5.sa_handler = HandlerAlarm;
+	A5.sa_flags = 0;
+	sigemptyset(&A5.sa_mask);
+	sigaction(SIGALRM,&A5,NULL);
+	//sigchild
+	struct sigaction A6;
+	A6.sa_handler = HandlerSigchld;
+	A6.sa_flags = 0;
+	sigemptyset(&A6.sa_mask);
+	sigaction(SIGCHLD,&A6,NULL);
 
 	//Init des mutex et variable de conditions
 	if(pthread_mutex_init(&mutexTab,NULL))
@@ -219,44 +252,6 @@ int main(int argc,char* argv[])
 		printf("[Main: %d][Erreur]pthread_cond_init sur condMode\n",getpid());
 		exit(1);
 	}
-
-	//Armement des signaux sur tout le processus
-	//sigint
-	struct sigaction A1;
-	A1.sa_handler = HandlerInt;
-	A1.sa_flags = 0;
-	sigemptyset(&A1.sa_mask);
-	sigaction(SIGINT,&A1,NULL);
-	//sighup
-	struct sigaction A2;
-	A2.sa_handler = HandlerHup;
-	A2.sa_flags = 0;
-	sigemptyset(&A2.sa_mask);
-	sigaction(SIGHUP,&A2,NULL);
-	//sigusr1
-	struct sigaction A3;
-	A3.sa_handler = HandlerUsr1;
-	A3.sa_flags = 0;
-	sigemptyset(&A3.sa_mask);
-	sigaction(SIGUSR1,&A3,NULL);
-	//sigusr2
-	struct sigaction A4;
-	A4.sa_handler = HandlerUsr2;
-	A4.sa_flags = 0;
-	sigemptyset(&A4.sa_mask);
-	sigaction(SIGUSR2,&A4,NULL);
-	//sigalrm pas de handler
-	struct sigaction A5;
-	A5.sa_handler = HandlerAlarm;
-	A5.sa_flags = 0;
-	sigemptyset(&A5.sa_mask);
-	sigaction(SIGALRM,&A5,NULL);
-	//sigchild
-	struct sigaction A6;
-	A6.sa_handler = HandlerSigchld;
-	A6.sa_flags = 0;
-	sigemptyset(&A6.sa_mask);
-	sigaction(SIGCHLD,&A6,NULL);
 
 
 	if(pthread_key_create(&key,NULL))
@@ -373,7 +368,7 @@ int main(int argc,char* argv[])
 	printf("[Main: %d][Fin]\n",pthread_self());
 
 	// Fermeture de la fenetre
-	printf("(MAIN %d) Fermeture de la fenetre graphique...",pthread_self()); fflush(stdout);
+	printf("[Main %d] Fermeture de la fenetre graphique...",pthread_self()); fflush(stdout);
 	FermetureFenetreGraphique();
 	printf("OK\n"); fflush(stdout);
 
@@ -400,7 +395,7 @@ void DessineGrilleBase()
 
 void* threadPacMan(void*)
 {
-	Debug("[threadPacMan: %d][Debut]\n",pthread_self());
+	printf("[threadPacMan: %d][Debut]\n",pthread_self());
 
 	int res = 0;
 	int etat;
@@ -452,9 +447,11 @@ void* threadPacMan(void*)
 	}
 	printf("[threadPacMan: %d][Info]PacMan a spawn L = %d C = %d\n",pthread_self(),L,C);
 
-	sigemptyset(&maskPacMan);
-	sigaddset(&maskPacMan,SIGCHLD);
-	sigaddset(&maskPacMan,SIGALRM);
+	sigfillset(&maskPacMan);
+	sigdelset(&maskPacMan,SIGUSR1);
+	sigdelset(&maskPacMan,SIGUSR2);
+	sigdelset(&maskPacMan,SIGHUP);
+	sigdelset(&maskPacMan,SIGINT);
 	sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 	while(1)
@@ -472,9 +469,11 @@ void* threadPacMan(void*)
 
 		Attente(delai);
 
-		sigemptyset(&maskPacMan);
-		sigaddset(&maskPacMan,SIGCHLD);
-		sigaddset(&maskPacMan,SIGALRM);
+		sigfillset(&maskPacMan);
+		sigdelset(&maskPacMan,SIGUSR1);
+		sigdelset(&maskPacMan,SIGUSR2);
+		sigdelset(&maskPacMan,SIGHUP);
+		sigdelset(&maskPacMan,SIGINT);
 		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 		if(pthread_mutex_lock(&mutexTab))
@@ -636,16 +635,30 @@ void* threadPacMan(void*)
 
 		if(mort)
 		{
+			if(pthread_mutex_unlock(&mutexTab))
+			{
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_unlock on mutexTab\n",pthread_self());
+				exit(1);
+			}
+
 			pthread_testcancel();
+			
+			if(pthread_mutex_lock(&mutexTab))
+			{
+				printf("[threadPacMan: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
+				exit(1);
+			}
 
 			sigfillset(&maskPacMan);
 			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 			EffaceCarre(L,C);
 
-			sigemptyset(&maskPacMan);
-			sigaddset(&maskPacMan,SIGCHLD);
-			sigaddset(&maskPacMan,SIGALRM);
+			sigfillset(&maskPacMan);
+			sigdelset(&maskPacMan,SIGUSR1);
+			sigdelset(&maskPacMan,SIGUSR2);
+			sigdelset(&maskPacMan,SIGHUP);
+			sigdelset(&maskPacMan,SIGINT);
 			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 			tab[L][C] = VIDE;
@@ -666,9 +679,11 @@ void* threadPacMan(void*)
 			EffaceCarre(L,C);
 			MonDessinePacMan(L2,C2,DIR);
 
-			sigemptyset(&maskPacMan);
-			sigaddset(&maskPacMan,SIGCHLD);
-			sigaddset(&maskPacMan,SIGALRM);
+			sigfillset(&maskPacMan);
+			sigdelset(&maskPacMan,SIGUSR1);
+			sigdelset(&maskPacMan,SIGUSR2);
+			sigdelset(&maskPacMan,SIGHUP);
+			sigdelset(&maskPacMan,SIGINT);
 			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 		}
 		if(mangerPacGom && !mort)
@@ -800,25 +815,26 @@ void* threadEvent(void*)
 		{
 			case CROIX:
 				pthread_exit(NULL);
+				Debug("[threadEvent: %d][Info]CROIX");
 				break;
 			case CLAVIER:
 				switch(event.touche)
 				{
 					case KEY_UP:
 						kill(getpid(),SIGUSR1);
-						Debug("[threadEvent: %d][Info]Reception SIGUSR1\n",pthread_self());
+						Debug("[threadEvent: %d][Info]SIGUSR1\n",pthread_self());
 						break;
 					case KEY_DOWN:
 						kill(getpid(),SIGUSR2);
-						Debug("[threadEvent: %d][Info]Reception SIGUSR2\n",pthread_self());
+						Debug("[threadEvent: %d][Info]SIGUSR2\n",pthread_self());
 						break;
 					case KEY_LEFT:
 						kill(getpid(),SIGINT);
-						Debug("[threadEvent: %d][Info]Reception SIGINT\n",pthread_self());
+						Debug("[threadEvent: %d][Info]SIGINT\n",pthread_self());
 						break;
 					case KEY_RIGHT:
 						kill(getpid(),SIGHUP);
-						Debug("[threadEvent: %d][Info]Reception SIGHUP\n",pthread_self());
+						Debug("[threadEvent: %d][Info]SIGHUP\n",pthread_self());
 						break;
 				}
 				break;
@@ -926,7 +942,7 @@ void* threadPacGom(void*)
 			DessineChiffre(12,24,valeur3);
 		}
 
-		Debug("[threadPacGom]Partie Gagnee");
+		Debug("[threadPacGom: %d]Partie Gagnee",pthread_self());
 
 		//Incrementer le niveai de jeu
 		if(pthread_mutex_lock(&mutexNiveauJeu))
@@ -1032,7 +1048,7 @@ void* threadScore(void*)
 
 void* threadBonus(void*)
 {
-	printf("[threadScore: %d][Debut]\n",pthread_self());
+	printf("[threadBonus: %d][Debut]\n",pthread_self());
 
 	sigset_t maskBonus;
 	sigfillset(&maskBonus);
@@ -1182,7 +1198,6 @@ void* threadCompteurFantomes(void*)
 	}
 }
 
-
 void* threadFantomes(void* p)
 {
 	printf("[threadFantomes: %d][Debut]\n",pthread_self());
@@ -1260,7 +1275,17 @@ void* threadFantomes(void* p)
 	sigfillset(&maskFantomes);
 	sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 
+	if(pthread_mutex_lock(&mutexDelai))
+	{
+		printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexDelai\n",pthread_self());
+		exit(1);
+	}
 	Attente(delai * (5 / 3));
+	if(pthread_mutex_unlock(&mutexDelai))
+	{
+		printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexDelai\n",pthread_self());
+		exit(1);
+	}
 
 	sigfillset(&maskFantomes);
 	sigdelset(&maskFantomes,SIGCHLD);
@@ -1492,7 +1517,6 @@ void* threadFantomes(void* p)
 			sigfillset(&maskFantomes);
 			sigdelset(&maskFantomes,SIGCHLD);
 			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-			pthread_cancel(tidPacMan);
 		}
 		else if(mode == 2)
 		{
@@ -1505,7 +1529,6 @@ void* threadFantomes(void* p)
 			sigfillset(&maskFantomes);
 			sigdelset(&maskFantomes,SIGCHLD);
 			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-			pthread_cancel(tidPacMan);
 		}
 		
 		tab[pFantome->L][pFantome->C] = pthread_self();
@@ -1553,20 +1576,21 @@ void* threadVies(void*)
 		pthread_join(tidPacMan,NULL);
 		if(pthread_mutex_lock(&mutexNbVies))
 		{
-			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexNbVies\n",pthread_self());
+			printf("[threadVies: %d][Erreur]pthread_mutex_lock on mutexNbVies\n",pthread_self());
 			exit(1);
 		}
 		nbVies--;
 		DessineChiffre(18,22,nbVies);
 		if(pthread_mutex_unlock(&mutexNbVies))
 		{
-			printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexNbVies\n",pthread_self());
+			printf("[threadVies: %d][Erreur]pthread_mutex_unlock on mutexNbVies\n",pthread_self());
 			exit(1);
 		}
 	}
 
 	//Ce delais permet d'etre sur que les fantomes sont bien figer
 	//car sinon ils peuvent panger le game over
+
 	Attente(delai);
 
 	DessineGameOver(9,4);
