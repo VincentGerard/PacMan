@@ -1274,18 +1274,8 @@ void* threadFantomes(void* p)
 
 	sigfillset(&maskFantomes);
 	sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-
-	if(pthread_mutex_lock(&mutexDelai))
-	{
-		printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexDelai\n",pthread_self());
-		exit(1);
-	}
+	
 	Attente(delai * (5 / 3));
-	if(pthread_mutex_unlock(&mutexDelai))
-	{
-		printf("[threadFantomes: %d][Erreur]pthread_mutex_unlock on mutexDelai\n",pthread_self());
-		exit(1);
-	}
 
 	sigfillset(&maskFantomes);
 	sigdelset(&maskFantomes,SIGCHLD);
