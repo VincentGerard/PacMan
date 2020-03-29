@@ -456,6 +456,8 @@ void* threadPacMan(void*)
 
 	while(1)
 	{
+		system("clear");
+		AfficheTab();
 		int modifier = 0;
 		int mangerPacGom = 0;
 		int mangerSuperPacGom = 0;
@@ -463,9 +465,10 @@ void* threadPacMan(void*)
 		int L2 = L;
 		int C2 = C;
 		int mort = 0;
+		int nextL = 0;
+		int nextC = 0;
 		//Zone critique ne pas recevoir de signal durant l'attente
-		sigfillset(&maskPacMan);
-		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+		
 
 		Attente(delai);
 
@@ -475,6 +478,39 @@ void* threadPacMan(void*)
 		sigdelset(&maskPacMan,SIGHUP);
 		sigdelset(&maskPacMan,SIGINT);
 		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+
+		sigfillset(&maskPacMan);
+		sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+
+		switch(DIR)
+		{
+			case HAUT:
+				nextL = L - 1;
+				nextC = C;
+				break;
+			case BAS:
+				nextL = L + 1;
+				nextC = C;
+				break;
+			case GAUCHE:
+				nextL = L;
+				nextC = C - 1;
+				if((C - 1) < 0)
+				{
+					nextL = L;
+					nextC = NB_COLONNE - 1;
+				}
+				break;
+			case DROITE:
+				nextL = L;
+				nextC = C + 1;
+				if((C + 1) >= NB_COLONNE)
+				{
+					nextL = L;
+					nextC = 0;
+				}
+				break;
+		}
 
 		if(pthread_mutex_lock(&mutexTab))
 		{
@@ -487,144 +523,25 @@ void* threadPacMan(void*)
 			exit(1);
 		}
 
-		switch(DIR)
+		if(tab[nextL][nextC] != MUR)
 		{
-			case HAUT:
-				if(tab[L - 1][C] != MUR)
-				{
-					if(tab[L - 1][C] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L - 1][C] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L - 1][C] == BONUS)
-						mangerBonus++;
-					else if(tab[L - 1][C] != VIDE && mode == 1)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L - 1][C]);
-						mort++;
-					}
-					else if(tab[L - 1][C] != VIDE && mode == 2)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L - 1][C]);
-						pthread_kill(tab[L - 1][C],SIGCHLD);
-					}
-					modifier++;
-					L2--;
-				}
-				else if(L == 0)
-				{
-					if(tab[NB_LIGNE - 1][C] == PACGOM)
-						mangerPacGom++;
-					else if(tab[NB_LIGNE - 1][C] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[NB_LIGNE - 1][C] == BONUS)
-						mangerBonus++;
-					modifier++;
-					L2 = NB_LIGNE - 1;
-				}	
-				break;
-			case BAS:
-				if(tab[L + 1][C] != MUR)
-				{
-					if(tab[L + 1][C] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L + 1][C] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L + 1][C] == BONUS)
-						mangerBonus++;
-					else if(tab[L + 1][C] != VIDE && mode == 1)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L + 1][C]);
-						mort++;
-					}
-					else if(tab[L + 1][C] != VIDE && mode == 2)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L + 1][C]);
-						pthread_kill(tab[L + 1][C],SIGCHLD);
-					}
-					modifier++;
-					L2++;
-				}
-				else if(L == NB_LIGNE -1)
-				{
-					if(tab[0][C] == PACGOM)
-						mangerPacGom++;
-					else if(tab[0][C] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[0][C] == BONUS)
-						mangerBonus++;
-					modifier++;
-					L2 = 0;
-				}
-				break;
-			case GAUCHE:
-				if(tab[L][C - 1] != MUR)
-				{
-					if(tab[L][C - 1] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L][C - 1] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L][C - 1] == BONUS)
-						mangerBonus++;
-					else if(tab[L][C - 1] != VIDE && mode == 1)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L][C - 1]);
-						mort++;
-					}
-					else if(tab[L][C - 1] != VIDE && mode == 2)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L][C - 1]);
-						pthread_kill(tab[L][C - 1],SIGCHLD);
-					}
-					modifier++;
-					C2--;
-				}
-				else if(C == 0)
-				{
-					if(tab[L][NB_COLONNE - 1] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L][NB_COLONNE - 1] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L][NB_COLONNE - 1] == BONUS)
-						mangerBonus++;
-					modifier++;
-					C2 = NB_COLONNE - 1;
-				}
-				break;
-			case DROITE:
-				if(tab[L][C + 1] != MUR)
-				{
-					if(tab[L][C + 1] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L][C + 1] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L][C + 1] == BONUS)
-						mangerBonus++;
-					else if(tab[L][C + 1] != VIDE && mode == 1)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L][C + 1]);
-						mort++;
-					}
-					else if(tab[L][C + 1] != VIDE && mode == 2)
-					{
-						printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L][C + 1]);
-						pthread_kill(tab[L][C + 1],SIGCHLD);
-					}
-					modifier++;
-					C2++;
-				}
-				else if(C == NB_COLONNE - 1)
-				{
-					if(tab[L][0] == PACGOM)
-						mangerPacGom++;
-					else if(tab[L][0] == SUPERPACGOM)
-						mangerSuperPacGom++;
-					else if(tab[L][0] == BONUS)
-						mangerBonus++;
-					modifier++;
-					C2 = 0;
-				}
-				break;
+			if(tab[nextL][nextC] == PACGOM)
+				mangerPacGom++;
+			else if(tab[nextL][nextC] == SUPERPACGOM)
+				mangerSuperPacGom++;
+			else if(tab[nextL][nextC] == BONUS)
+				mangerBonus++;
+			else if(tab[nextL][nextC] != VIDE && mode == 1)
+			{
+				printf("[threadPacMan: %d][Info]Pacman a manger un fantome: %d\n",pthread_self(),tab[L - 1][C]);
+				mort++;
+			}
+			else if(tab[nextL][nextC] != VIDE && mode == 2)
+			{
+				printf("[threadPacMan: %d][Info]Pacman a manger un fantome commestible: %d\n",pthread_self(),tab[L - 1][C]);
+				pthread_kill(tab[nextL][nextC],SIGCHLD);
+			}
+			modifier++;
 		}
 
 		if(pthread_mutex_unlock(&mutexMode))
@@ -633,7 +550,7 @@ void* threadPacMan(void*)
 			exit(1);
 		}
 
-		if(mort)
+		if(mort) 
 		{
 			if(pthread_mutex_unlock(&mutexTab))
 			{
@@ -649,17 +566,7 @@ void* threadPacMan(void*)
 				exit(1);
 			}
 
-			sigfillset(&maskPacMan);
-			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
-
 			EffaceCarre(L,C);
-
-			sigfillset(&maskPacMan);
-			sigdelset(&maskPacMan,SIGUSR1);
-			sigdelset(&maskPacMan,SIGUSR2);
-			sigdelset(&maskPacMan,SIGHUP);
-			sigdelset(&maskPacMan,SIGINT);
-			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
 
 			tab[L][C] = VIDE;
 			if(pthread_mutex_unlock(&mutexTab))
@@ -672,19 +579,9 @@ void* threadPacMan(void*)
 		
 		if(modifier && !mort)
 		{
-			sigfillset(&maskPacMan);
-			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
-
 			tab[L][C] = VIDE;
 			EffaceCarre(L,C);
-			MonDessinePacMan(L2,C2,DIR);
-
-			sigfillset(&maskPacMan);
-			sigdelset(&maskPacMan,SIGUSR1);
-			sigdelset(&maskPacMan,SIGUSR2);
-			sigdelset(&maskPacMan,SIGHUP);
-			sigdelset(&maskPacMan,SIGINT);
-			sigprocmask(SIG_SETMASK,&maskPacMan,NULL);
+			MonDessinePacMan(nextL,nextC,DIR);
 		}
 		if(mangerPacGom && !mort)
 		{
@@ -786,6 +683,7 @@ void* threadPacMan(void*)
 			}
 			pthread_cond_signal(&condScore);
 		}
+
 
 		if(pthread_mutex_unlock(&mutexTab))
 		{
@@ -1297,6 +1195,13 @@ void* threadFantomes(void* p)
 		newDirOk = 0;
 		bloquer = 0;
 
+		sigfillset(&maskFantomes);
+		sigdelset(&maskFantomes,SIGCHLD);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
+		sigfillset(&maskFantomes);
+		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
+
 		if(pthread_mutex_lock(&mutexTab))
 		{
 			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexTab\n",pthread_self());
@@ -1307,9 +1212,6 @@ void* threadFantomes(void* p)
 			printf("[threadFantomes: %d][Erreur]pthread_mutex_lock on mutexMode\n",pthread_self());
 			exit(1);
 		}
-
-		sigfillset(&maskFantomes);
-		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 
 		//Restitution du Cache
 		switch(pFantome->cache)
@@ -1335,10 +1237,6 @@ void* threadFantomes(void* p)
 				exit(1);
 				break;
 		}
-
-		sigfillset(&maskFantomes);
-		sigdelset(&maskFantomes,SIGCHLD);
-		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 
 		tab[pFantome->L][pFantome->C] = newTabVal;
 		
@@ -1392,15 +1290,8 @@ void* threadFantomes(void* p)
 				exit(1);
 			}
 
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-
 			EffaceCarre(nextL,nextC);
 
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 			pthread_cancel(tidPacMan);
 		}
 
@@ -1497,29 +1388,10 @@ void* threadFantomes(void* p)
 
 		//Afficher le fantome
 		if(mode == 1)
-		{
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-			
 			DessineFantome(pFantome->L,pFantome->C,pFantome->couleur,dirFantome);
-			
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-		}
 		else if(mode == 2)
-		{
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-
 			DessineFantomeComestible(pFantome->L,pFantome->C);
-
-			sigfillset(&maskFantomes);
-			sigdelset(&maskFantomes,SIGCHLD);
-			sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-		}
+		
 		
 		tab[pFantome->L][pFantome->C] = pthread_self();
 	
@@ -1534,14 +1406,7 @@ void* threadFantomes(void* p)
 			exit(1);
 		}
 
-		sigfillset(&maskFantomes);
-		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
-
 		Attente(delai * (5 / 3));
-
-		sigfillset(&maskFantomes);
-		sigdelset(&maskFantomes,SIGCHLD);
-		sigprocmask(SIG_SETMASK,&maskFantomes,NULL);
 	}
 	pthread_cleanup_pop(0);
 	pthread_kill(tidCompteurFantomes,SIGQUIT);
