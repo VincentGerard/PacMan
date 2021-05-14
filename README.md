@@ -1,5 +1,6 @@
 # PacMan
 Ce project a été réaliser dans le cadre du cours de Thead à l’Inpres (HEPL).
-Le but du projet était de recrée le jeu Pacman en utilisant la librairie SDL, utiliser des threads pour la gestion du gameplay et utiliser des signaux pour la communication entre threads.
+
+Développement du jeu Pac-Man sous Linux Solaris, utilisation de la librairie SDL pour l’interface. Utilisation de la mémoire partagée, des signaux ainsi que les pipe/file de messages pour la communication entre les différents threads. Utilisation de threads synchrones et asynchrones.
 
 <img src="images/Pacman_Fini.PNG">
