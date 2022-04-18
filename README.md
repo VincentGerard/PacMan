@@ -1,6 +1,7 @@
 # PacMan
-Ce project a été réaliser dans le cadre du cours de Thead à l’Inpres (HEPL).
 
-Développement du jeu Pac-Man sous Linux Solaris, utilisation de la librairie SDL pour l’interface. Utilisation de la mémoire partagée, des signaux ainsi que les pipe/file de messages pour la communication entre les différents threads. Utilisation de threads synchrones et asynchrones.
+This project was done during my studies of Computer Science at Inpres(HEPL) in Liège.
+
+Development of a Pac-Man clone on Solaris using SDL. Threaded application using shared memory, mutex, signals and pipes for communication.
 
 <img src="images/Pacman_Fini.PNG">
